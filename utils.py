@@ -30,7 +30,7 @@ class ParsedTags:
 
 
 def sanitise_tag(tag):
-  return re.sub(r'[^\w:]', '_', tag.lower()).strip('_')
+  return re.sub(r'[^\w:]', '_', tag.lower().replace("'", '')).strip('_')
 
 
 def parse_tags(tags):
