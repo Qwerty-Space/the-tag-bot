@@ -57,11 +57,16 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
   pos = res[:num_positive]
   neg = res[num_positive:]
 
-  good = ParsedTags(
-    set(r['match'] for r in pos if r['dist'] <= TAG_DIFF_MAX),
-    set(r['match'] for r in neg if r['dist'] <= TAG_DIFF_MAX)
+  tag_matches = (
+    lambda r:
+    r['dist'] <= TAG_DIFF_MAX
+    or (len(r['search_tag']) >= 4 and r['search_tag'] in r['match'])
   )
-  bad = [r for r in itertools.chain(pos, neg) if r['dist'] > TAG_DIFF_MAX]
+  good = ParsedTags(
+    set(r['match'] for r in pos if tag_matches(r)),
+    set(r['match'] for r in neg if tag_matches(r))
+  )
+  bad = [r for r in itertools.chain(pos, neg) if not tag_matches(r)]
 
   return good, bad
 
