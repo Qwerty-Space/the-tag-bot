@@ -127,3 +127,18 @@ DROP TRIGGER IF EXISTS trigger_delete_zero_count_tags ON tags;
 CREATE TRIGGER trigger_delete_zero_count_tags
 AFTER UPDATE ON tags
 FOR EACH ROW EXECUTE PROCEDURE func_delete_tag_if_zero_count()
+
+-- for when tag counts are incorrect (should only happen during development)
+CREATE OR REPLACE FUNCTION func_regenerate_tag_counts() RETURNS void AS
+$$
+BEGIN
+	INSERT INTO tags (owner, type, name, count)
+	(
+		SELECT owner::bigint, type::media_type, tag::text, COUNT(tag)::integer FROM media, LATERAL (
+			SELECT * FROM split_tags(all_tags)
+		) AS tag
+		GROUP BY owner, type, tag
+	) ON CONFLICT (name, owner, type) DO UPDATE SET count = excluded.count;
+END
+$$
+LANGUAGE PLPGSQL
