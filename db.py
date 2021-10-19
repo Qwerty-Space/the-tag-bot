@@ -106,6 +106,7 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
     or (len(r['search_tag']) >= 4 and r['search_tag'] in r['match'])
   )
   good = ParsedTags(
+    m_type.value,
     set(r['match'] for r in pos if tag_matches(r)),
     set(r['match'] for r in neg if tag_matches(r))
   )
