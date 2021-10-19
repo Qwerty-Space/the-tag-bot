@@ -15,7 +15,7 @@ async def get_media_metatags(file):
   tags = []
 
   if file.mime_type == 'application/x-tgsticker':
-    tags.append('t:animated')
+    tags.append('a:animated')
 
   pack = await p_cached.get_sticker_pack(file.sticker_set)
   if pack:
