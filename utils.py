@@ -14,7 +14,7 @@ class MediaTypes(str, Enum):
   gif = 'gif'
   video = 'video'
   sticker = 'sticker'
-  document = 'document'
+  file = 'file'
 
 
 def get_media_type(media):
@@ -30,7 +30,7 @@ def get_media_type(media):
         return MediaTypes.video
       if isinstance(attr, tl.types.DocumentAttributeSticker):
         return MediaTypes.sticker
-  return MediaTypes.document
+  return MediaTypes.file
 
 
 @dataclass
