@@ -8,7 +8,6 @@ from utils import ParsedTags, MediaTypes, acached
 
 pool: asyncpg.BuildPgPool
 logger = logging.getLogger('db')
-# TODO: put this somewhere else
 TAG_DIFF_MAX = 0.7
 
 
