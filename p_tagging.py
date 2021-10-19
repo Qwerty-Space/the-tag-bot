@@ -4,14 +4,14 @@ import mimetypes
 
 from telethon import events, tl
 from telethon.tl.functions.messages import GetStickerSetRequest
-from telethon.tl.types import InputDocument
+from telethon.tl.types import InputDocument, InputPhoto
 
 from proxy_globals import client
 import p_cached
 import db, utils
 
 
-async def get_media_metatags(file):
+async def get_media_generated_tags(file):
   tags = []
 
   if file.mime_type == 'application/x-tgsticker':
@@ -22,26 +22,40 @@ async def get_media_metatags(file):
     tags.append(utils.sanitise_tag(f'g:{pack.title}'))
 
   exts = set(mimetypes.guess_all_extensions(file.mime_type))
+  # TODO: maybe extract file name to tags
   if file.name:
     ext = os.path.splitext(file.name)[1]
     if ext:
       exts.add(ext)
   tags.extend(f"e:{ext.lstrip('.')}" for ext in exts)
-  return ' '.join(tags)
+  return utils.get_media_type(file.media), ' '.join(tags)
 
 
 @client.on(events.InlineQuery())
 async def on_inline(event: events.InlineQuery.Event):
   user_id = event.query.user_id
   tags = utils.parse_tags(event.text)
-  tags, _ = await db.get_corrected_user_tags(user_id, tags)
-  rows = await db.search_user_media(user_id, tags)
+  m_type, tags = await db.get_corrected_user_tags(user_id, tags)
+  if not m_type:
+    await event.answer(
+      switch_pm='Failed to parse media type',
+      switch_pm_param='parse' # TODO: make this work
+    )
+    return
+
+  rows = await db.search_user_media(user_id, m_type, tags)
+
   builder = event.builder
+  if m_type == utils.MediaTypes.photo:
+    get_result = lambda r: builder.photo(InputPhoto(r['id'], r['access_hash'], b''))
+  else:
+    get_result = (
+      lambda r: builder.document(
+        InputDocument(r['id'], r['access_hash'], b''), type=m_type.value
+      )
+    )
   await event.answer(
-    [
-      builder.document(InputDocument(r['id'], r['access_hash'], b''), '', type='photo')
-      for r in rows
-    ],
+    [get_result(r) for r in rows],
     cache_time=0,
     private=True,
   )
@@ -67,9 +81,14 @@ async def on_tag(event):
   old_tags = set(old_tags.split(' ')) if old_tags else set()
 
   new_tags = ' '.join((old_tags | tags.pos) - tags.neg)
-  metatags = await get_media_metatags(reply.file)
+  m_type, metatags = await get_media_generated_tags(reply.file)
   await db.set_media_tags(
-    file_id, m.sender_id, access_hash, metatags, new_tags
+    id=file_id,
+    owner=m.sender_id,
+    m_type=m_type,
+    access_hash=access_hash,
+    metatags=metatags,
+    tags=new_tags
   )
   await event.reply(
     f'Tags for {file_id}:\n[meta] {metatags}\n{new_tags}',
@@ -81,39 +100,44 @@ async def on_tag(event):
 async def parse(event: events.NewMessage.Event):
   def format_tags(tags):
     if tags.is_empty():
-      return '<empty>'
+      return '[no tags]'
     return ' '.join(chain(tags.pos, (f'!{tag}' for tag in tags.neg)))
 
-  query = event.pattern_match.group(1)
-  tags = utils.parse_tags(query)
-  if tags.is_empty():
-    await event.reply('No valid tags found.')
-    return
+  tags = utils.parse_tags(event.pattern_match.group(1))
+  out_text = f'input: <t:{tags.type}> {format_tags(tags)}'
 
-  out_text = f'input: {format_tags(tags)}'
+  m_type, tags = await db.get_corrected_user_tags(event.sender_id, tags)
+  if m_type:
+    out_text += f'\noutput: <t:{m_type.value}> {format_tags(tags)}'
+  else:
+    out_text += '\noutput: <error> (unable to infer type)'
 
-  tags, dropped = await db.get_corrected_user_tags(event.sender_id, tags)
-  out_text += f'\noutput: {format_tags(tags)}'
-
-  if dropped:
-    out_text += '\n\ndropped:'
-    for row in dropped:
-      out_text += f"\n{row['search_tag']} ≉ {row['match']} (Δ={round(row['dist'] * 100)}%)"
+  # TODO: fix
+  # if dropped:
+  #   out_text += '\n\ndropped:'
+  #   for row in dropped:
+  #     out_text += f"\n{row['search_tag']} ≉ {row['match']} (Δ={round(row['dist'] * 100)}%)"
 
   await event.reply(out_text, parse_mode=None)
 
 
-@client.on(events.NewMessage(pattern='/mytags'))
+@client.on(events.NewMessage(pattern=r'/mytags ?(.*)'))
 async def my_tags(event: events.NewMessage.Event):
-  rows = await db.get_user_tags(event.sender_id)
+  type_str = event.pattern_match.group(1) or utils.MediaTypes.sticker.value
+  m_type = await db.get_corrected_media_type(type_str)
+  if not my_tags:
+    await event.reply('I don\'t understand what that type refers to!')
+    return
+
+  rows = await db.get_user_tags_for_type(event.sender_id, m_type)
   if not rows:
-    await event.reply('You have not tagged any media.')
+    await event.reply('You have not tagged any media of that type.')
     return
 
   out_text = '\n'.join(
     f"{r['name']} ({r['count']})" for r in rows
   )
   await event.reply(
-    f'Your tags (including metatags):\n{out_text}',
+    f'Your tags for t:{m_type.value}:\n{out_text}',
     parse_mode=None
   )

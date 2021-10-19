@@ -1,33 +1,13 @@
-import functools
 from dataclasses import dataclass
 from collections import defaultdict
 
 from telethon import errors
 from telethon.tl.types.messages import StickerSet
 from telethon.tl.functions.messages import GetStickerSetRequest
-from cachetools import keys, LRUCache
+from cachetools import LRUCache
 
 from proxy_globals import client
-
-
-# Abridged version of https://github.com/hephex/asyncache
-def acached(cache, key=keys.hashkey):
-  def decorator(func):
-    @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
-      k = key(*args, **kwargs)
-      try:
-        return cache[k]
-      except KeyError:
-        pass  # key not found
-      val = await func(*args, **kwargs)
-      try:
-        cache[k] = val
-      except ValueError:
-        pass  # val too large
-      return val
-    return wrapper
-  return decorator
+from utils import acached
 
 
 # StickerSet without unused data

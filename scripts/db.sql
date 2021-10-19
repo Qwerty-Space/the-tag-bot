@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS media (
   owner BIGINT NOT NULL,
   PRIMARY KEY (id, owner),
   access_hash BIGINT NOT NULL,
+  type media_type NOT NULL,
   metatags TEXT NOT NULL,
   tags TEXT,
   all_tags TEXT NOT NULL GENERATED ALWAYS AS
@@ -25,8 +26,9 @@ CREATE TABLE IF NOT EXISTS tags (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   owner BIGINT NOT NULL DEFAULT 0,
+  type media_type,
   count INTEGER NOT NULL DEFAULT 1,
-  UNIQUE(name, owner)
+  UNIQUE(name, owner, type)
 );
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 CREATE INDEX IF NOT EXISTS index_tags_on_name_trgm ON tags USING gist (name gist_trgm_ops);
@@ -90,11 +92,11 @@ BEGIN
   WITH tag_diff AS (
     SELECT * FROM _get_tag_diff(TG_OP, old_v, new_v)
   )
-  INSERT INTO tags (name, owner, count)
+  INSERT INTO tags (name, owner, type, count)
   (
-    SELECT tag, new_v.owner AS owner, count FROM tag_diff
+    SELECT tag, new_v.owner AS owner, new_v.type as type, count FROM tag_diff
   )
-  ON CONFLICT (name, owner) DO UPDATE
+  ON CONFLICT (name, owner, type) DO UPDATE
   SET count = GREATEST(tags.count + EXCLUDED.count, 0);
 
   RETURN NULL;

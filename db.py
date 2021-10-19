@@ -1,10 +1,10 @@
-import asyncio
 import logging
 import itertools
 
-from buildpg import asyncpg, V, funcs, Func, RawDangerous
+from buildpg import asyncpg, V, Func, RawDangerous
+from cachetools import LRUCache
 
-from utils import ParsedTags, MediaTypes
+from utils import ParsedTags, MediaTypes, acached
 
 pool: asyncpg.BuildPgPool
 logger = logging.getLogger('db')
@@ -13,38 +13,42 @@ TAG_DIFF_MAX = 0.7
 
 
 async def set_media_tags(
-  id: int, owner: int, access_hash: int, metatags: str, tags: str
+  id: int, owner: int, access_hash: int,
+  m_type: MediaTypes, metatags: str, tags: str
 ):
-  await pool.execute(
+  await pool.execute_b(
     '''
     INSERT INTO media
-    (id, owner, access_hash, metatags, tags) VALUES ($1, $2, $3, $4, $5)
+    (id, owner, access_hash, type, metatags, tags) VALUES
+      (:id, :owner, :access_hash, :type, :metatags, :tags)
     ON CONFLICT (id, owner) DO UPDATE
-    SET metatags = $4, tags = $5;
+    SET access_hash = :access_hash, type = :type, metatags = :metatags, tags = :tags;
     ''',
-    id, owner, access_hash, metatags, tags
+    id=id, owner=owner, access_hash=access_hash,
+    type=m_type.value, metatags=metatags, tags=tags
   )
 
 
 async def get_media_tags(id: int, owner: int):
-  return await pool.fetchval(
-    'SELECT tags FROM media WHERE id = $1 AND owner = $2',
-    id, owner
+  return await pool.fetchrow_b(
+    'SELECT type, tags FROM media WHERE id = :id AND owner = :owner',
+    id=id, owner=owner
   )
 
 
-async def get_user_tags(owner: int):
-  return await pool.fetch(
-    'SELECT name, count FROM tags WHERE owner = $1 ORDER BY count DESC',
-    owner
+async def get_user_tags_for_type(owner: int, m_type: MediaTypes):
+  return await pool.fetch_b(
+    '''SELECT name, count FROM tags WHERE
+    owner = :owner and type = :type ORDER BY count DESC''',
+    owner=owner, type=m_type.value
   )
 
 
-async def search_user_media(owner: int, tags: ParsedTags):
+async def search_user_media(owner: int, m_type: MediaTypes, tags: ParsedTags):
   space_split = lambda s1: Func('string_to_array', s1, RawDangerous("' '"))
   all_tags_split = lambda: space_split(V('all_tags'))
 
-  where_logic = V('owner') == owner
+  where_logic = (V('owner') == owner) & (V('type') == m_type.value)
   if tags.pos:
     where_logic &= all_tags_split().contains(space_split(' '.join(tags.pos)))
   if tags.neg:
@@ -56,19 +60,43 @@ async def search_user_media(owner: int, tags: ParsedTags):
   )
 
 
-# TODO: cache each corrected tag (per user)
+@acached(LRUCache(1024))
+async def get_corrected_media_type(search_val: str):
+  try:
+    return MediaTypes(search_val)
+  except ValueError:
+    pass
+
+  row = await pool.fetchrow_b(
+    '''
+    SELECT name AS match, name::text <-> :search_val::text AS dist
+    FROM UNNEST(enum_range(NULL::media_type)) name ORDER BY dist LIMIT 1
+    ''',
+    search_val=search_val
+  )
+  if row['dist'] <= TAG_DIFF_MAX:
+    return MediaTypes(row['match'])
+  return None
+
+
+# TODO: cache each corrected tag (per user and type)
 async def get_corrected_user_tags(owner: int, tags: ParsedTags):
+  m_type = await get_corrected_media_type(tags.type)
+  if not m_type:
+    # No point correcting tags if we don't know what type to look for
+    return m_type, None
+
   num_positive = len(tags.pos)
   tag_str = ' '.join(itertools.chain(tags.pos, tags.neg))
-  res = await pool.fetch(
+  res = await pool.fetch_b(
     '''
-    SELECT * FROM UNNEST(string_to_array($2, ' ')) search_tag,
+    SELECT * FROM UNNEST(string_to_array(:tag_str, ' ')) search_tag,
     LATERAL (
       SELECT name AS match, name <-> search_tag AS dist
-      FROM tags WHERE owner = $1 ORDER BY dist LIMIT 1
+      FROM tags WHERE owner = :owner AND type = :m_type ORDER BY dist LIMIT 1
     ) AS s;
     ''',
-    owner, tag_str
+    owner=owner, m_type=m_type, tag_str=tag_str
   )
   pos = res[:num_positive]
   neg = res[num_positive:]
@@ -82,9 +110,10 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
     set(r['match'] for r in pos if tag_matches(r)),
     set(r['match'] for r in neg if tag_matches(r))
   )
-  bad = [r for r in itertools.chain(pos, neg) if not tag_matches(r)]
+  # TODO: return this in some kind of hint wrapper
+  # bad = [r for r in itertools.chain(pos, neg) if not tag_matches(r)]
 
-  return good, bad
+  return m_type, good
 
 
 async def init():
