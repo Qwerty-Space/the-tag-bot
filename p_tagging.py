@@ -4,6 +4,7 @@ import mimetypes
 
 from telethon import events, tl
 from telethon.tl.functions.messages import GetStickerSetRequest
+from telethon.tl.types import InputDocument
 
 from proxy_globals import client
 import p_cached
@@ -31,10 +32,22 @@ async def get_media_metatags(file):
 
 
 @client.on(events.InlineQuery())
-async def on_inline(event: events.NewMessage.Event):
+async def on_inline(event: events.InlineQuery.Event):
   user_id = event.query.user_id
-  query = event.query.query
-  print(event.stringify())
+  tags = utils.parse_tags(event.text)
+  tags, _ = await db.get_corrected_user_tags(user_id, tags)
+  # print(event.stringify())
+  rows = await db.search_user_media(user_id, tags)
+  print(rows)
+  builder = event.builder
+  await event.answer(
+    [
+      builder.document(InputDocument(r['id'], r['access_hash'], b''), '', type='photo')
+      for r in rows
+    ],
+    cache_time=0,
+    private=True,
+  )
 
 
 @client.on(events.NewMessage())

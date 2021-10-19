@@ -2,11 +2,11 @@ import asyncio
 import logging
 import itertools
 
-import asyncpg
+from buildpg import asyncpg, V, funcs, Func, RawDangerous
 
 from utils import ParsedTags
 
-pool: asyncpg.pool.Pool
+pool: asyncpg.BuildPgPool
 logger = logging.getLogger('db')
 # TODO: put this somewhere else
 TAG_DIFF_MAX = 0.7
@@ -37,6 +37,22 @@ async def get_user_tags(owner: int):
   return await pool.fetch(
     'SELECT name, count FROM tags WHERE owner = $1 ORDER BY count DESC',
     owner
+  )
+
+
+async def search_user_media(owner: int, tags: ParsedTags):
+  space_split = lambda s1: Func('string_to_array', s1, RawDangerous("' '"))
+  all_tags_split = lambda: space_split(V('all_tags'))
+
+  where_logic = V('owner') == owner
+  if tags.pos:
+    where_logic &= all_tags_split().contains(space_split(' '.join(tags.pos)))
+  if tags.neg:
+    where_logic &= ~all_tags_split().overlap(space_split(' '.join(tags.neg)))
+
+  return await pool.fetch_b(
+    'SELECT id, access_hash, metatags FROM media WHERE :where ORDER BY last_used_at DESC',
+    where=where_logic
   )
 
 
@@ -74,7 +90,7 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
 async def init():
   global pool
   logger.info('Creating connection pool...')
-  pool = await asyncpg.create_pool(
+  pool = await asyncpg.create_pool_b(
     database='tagbot',
     user='tagbot',
     host='localhost'
