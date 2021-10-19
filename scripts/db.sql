@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS media (
   PRIMARY KEY (id, owner),
   access_hash BIGINT NOT NULL,
   type media_type NOT NULL,
+  title TEXT NOT NULL,
   metatags TEXT NOT NULL,
   tags TEXT,
   all_tags TEXT NOT NULL GENERATED ALWAYS AS

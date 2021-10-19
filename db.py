@@ -13,18 +13,19 @@ TAG_DIFF_MAX = 0.7
 
 async def set_media_tags(
   id: int, owner: int, access_hash: int,
-  m_type: MediaTypes, metatags: str, tags: str
+  m_type: MediaTypes, title: str, metatags: str, tags: str
 ):
   await pool.execute_b(
     '''
     INSERT INTO media
-    (id, owner, access_hash, type, metatags, tags) VALUES
-      (:id, :owner, :access_hash, :type, :metatags, :tags)
+    (id, owner, access_hash, type, title, metatags, tags) VALUES
+      (:id, :owner, :access_hash, :type, :title, :metatags, :tags)
     ON CONFLICT (id, owner) DO UPDATE
-    SET access_hash = :access_hash, type = :type, metatags = :metatags, tags = :tags;
+    SET access_hash = :access_hash, type = :type, title = :title,
+      metatags = :metatags, tags = :tags;
     ''',
     id=id, owner=owner, access_hash=access_hash,
-    type=m_type.value, metatags=metatags, tags=tags
+    type=m_type.value, title=title, metatags=metatags, tags=tags
   )
 
 
@@ -54,7 +55,10 @@ async def search_user_media(owner: int, m_type: MediaTypes, tags: ParsedTags):
     where_logic &= ~all_tags_split().overlap(space_split(' '.join(tags.neg)))
 
   return await pool.fetch_b(
-    'SELECT id, access_hash, metatags FROM media WHERE :where ORDER BY last_used_at DESC',
+    '''
+    SELECT id, access_hash, title FROM media
+    WHERE :where ORDER BY last_used_at DESC
+    ''',
     where=where_logic
   )
 

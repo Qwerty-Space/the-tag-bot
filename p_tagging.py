@@ -22,13 +22,20 @@ async def get_media_generated_tags(file):
     tags.append(utils.sanitise_tag(f'g:{pack.title}'))
 
   ext = mimetypes.guess_extension(file.mime_type)
+
   # TODO: maybe extract file name to tags
+  file_title = file.name or ''
+  if file.performer and file.title:
+    file_title = f'{file.performer} - {file.title}'
+    tags.append(utils.sanitise_tag(f'a:{file.performer}'))
+    tags.append(utils.sanitise_tag(f'n:{file.title}'))
+
   if file.name:
     file_ext = os.path.splitext(file.name)[1]
     if file_ext:
       ext = file_ext
   tags.append(f"e:{ext.lstrip('.')}")
-  return utils.get_media_type(file.media), ' '.join(tags)
+  return utils.get_media_type(file.media), file_title, ' '.join(tags)
 
 
 @client.on(events.InlineQuery())
@@ -44,6 +51,10 @@ async def on_inline(event: events.InlineQuery.Event):
     return
 
   rows = await db.search_user_media(user_id, m_type, tags)
+  result_type = {
+    # 'audio' only works for audio/mpeg, thanks durov
+    utils.MediaTypes.audio: utils.MediaTypes.file
+  }.get(m_type, m_type).value
 
   builder = event.builder
   if m_type == utils.MediaTypes.photo:
@@ -51,7 +62,7 @@ async def on_inline(event: events.InlineQuery.Event):
   else:
     get_result = (
       lambda r: builder.document(
-        InputDocument(r['id'], r['access_hash'], b''), type=m_type.value
+        InputDocument(r['id'], r['access_hash'], b''), type=result_type, title=r['title']
       )
     )
   await event.answer(
@@ -81,12 +92,13 @@ async def on_tag(event):
   old_tags = set(old_tags.split(' ')) if old_tags else set()
 
   new_tags = ' '.join((old_tags | tags.pos) - tags.neg)
-  m_type, metatags = await get_media_generated_tags(reply.file)
+  m_type, title, metatags = await get_media_generated_tags(reply.file)
   await db.set_media_tags(
     id=file_id,
     owner=m.sender_id,
-    m_type=m_type,
     access_hash=access_hash,
+    m_type=m_type,
+    title=title,
     metatags=metatags,
     tags=new_tags
   )
