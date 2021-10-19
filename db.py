@@ -4,7 +4,7 @@ import itertools
 
 from buildpg import asyncpg, V, funcs, Func, RawDangerous
 
-from utils import ParsedTags
+from utils import ParsedTags, MediaTypes
 
 pool: asyncpg.BuildPgPool
 logger = logging.getLogger('db')
@@ -96,15 +96,7 @@ async def init():
     host='localhost'
   )
 
-  logger.info('Creating tables...')
-
-  # TODO: put this behind a --init flag
-  with open('db.sql') as f:
-    sql = f.read()
-
-  await pool.execute(sql)
-
-  async with pool.acquire() as con:
-    await con.execute(sql)
+  rows = await pool.fetch_b('SELECT unnest(enum_range(NULL::media_type)) as v')
+  assert set(r['v'] for r in rows) == set(e.value for e in MediaTypes)
 
   logger.info('Initialized')

@@ -12,13 +12,12 @@ import db, utils
 
 
 async def get_media_metatags(file):
-  tags = [f't:{utils.get_media_type(file.media)}']
+  tags = []
 
   if file.mime_type == 'application/x-tgsticker':
     tags.append('t:animated')
 
   pack = await p_cached.get_sticker_pack(file.sticker_set)
-  print(pack)
   if pack:
     tags.append(utils.sanitise_tag(f'g:{pack.title}'))
 
@@ -36,9 +35,7 @@ async def on_inline(event: events.InlineQuery.Event):
   user_id = event.query.user_id
   tags = utils.parse_tags(event.text)
   tags, _ = await db.get_corrected_user_tags(user_id, tags)
-  # print(event.stringify())
   rows = await db.search_user_media(user_id, tags)
-  print(rows)
   builder = event.builder
   await event.answer(
     [

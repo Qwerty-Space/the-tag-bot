@@ -1,23 +1,33 @@
 import re
+from enum import Enum
 from dataclasses import dataclass, field
 
 from telethon import tl
 
 
+class MediaTypes(str, Enum):
+  photo = 'photo'
+  audio = 'audio'
+  gif = 'gif'
+  video = 'video'
+  sticker = 'sticker'
+  document = 'document'
+
+
 def get_media_type(media):
   if isinstance(media, tl.types.Photo):
-    return 'photo'
+    return MediaTypes.photo
   if isinstance(media, tl.types.Document):
     for attr in media.attributes:
       if isinstance(attr, tl.types.DocumentAttributeAudio):
-        return 'audio'
+        return MediaTypes.audio
       if isinstance(attr, tl.types.DocumentAttributeAnimated):
-        return 'gif'
+        return MediaTypes.gif
       if isinstance(attr, tl.types.DocumentAttributeVideo):
-        return 'video'
+        return MediaTypes.video
       if isinstance(attr, tl.types.DocumentAttributeSticker):
-        return 'sticker'
-  return 'document'
+        return MediaTypes.sticker
+  return MediaTypes.document
 
 
 @dataclass
