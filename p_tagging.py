@@ -104,13 +104,13 @@ async def parse(event: events.NewMessage.Event):
     return ' '.join(chain(tags.pos, (f'!{tag}' for tag in tags.neg)))
 
   tags = utils.parse_tags(event.pattern_match.group(1))
-  out_text = f'input: <t:{tags.type}> {format_tags(tags)}'
+  out_text = f'parsed: <t:{tags.type}> {format_tags(tags)}'
 
   m_type, tags = await db.get_corrected_user_tags(event.sender_id, tags)
   if m_type:
-    out_text += f'\noutput: <t:{m_type.value}> {format_tags(tags)}'
+    out_text += f'\ncorrected: <t:{m_type.value}> {format_tags(tags)}'
   else:
-    out_text += '\noutput: <error> (unable to infer type)'
+    out_text += '\ncorrected: <error> (unable to infer type)'
 
   # TODO: fix
   # if dropped:
