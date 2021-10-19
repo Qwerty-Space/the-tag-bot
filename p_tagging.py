@@ -91,7 +91,7 @@ async def on_tag(event):
     tags=new_tags
   )
   await event.reply(
-    f'Tags for {file_id}:\n[meta] {metatags}\n{new_tags}',
+    f'Tags for {file_id}:\n[meta] <t:{m_type.value}> {metatags}\n{new_tags}',
     parse_mode=None
   )
 
