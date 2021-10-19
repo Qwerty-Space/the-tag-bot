@@ -1,7 +1,10 @@
 import asyncio
 from buildpg import asyncpg, funcs, RawDangerous
 
-from .. import utils
+import importlib.util
+spec = importlib.util.spec_from_file_location("utils", "../utils.py")
+utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(utils)
 
 
 async def init():
