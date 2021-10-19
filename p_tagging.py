@@ -21,13 +21,13 @@ async def get_media_generated_tags(file):
   if pack:
     tags.append(utils.sanitise_tag(f'g:{pack.title}'))
 
-  exts = set(mimetypes.guess_all_extensions(file.mime_type))
+  ext = mimetypes.guess_extension(file.mime_type)
   # TODO: maybe extract file name to tags
   if file.name:
-    ext = os.path.splitext(file.name)[1]
-    if ext:
-      exts.add(ext)
-  tags.extend(f"e:{ext.lstrip('.')}" for ext in exts)
+    file_ext = os.path.splitext(file.name)[1]
+    if file_ext:
+      ext = file_ext
+  tags.append(f"e:{ext.lstrip('.')}")
   return utils.get_media_type(file.media), ' '.join(tags)
 
 
