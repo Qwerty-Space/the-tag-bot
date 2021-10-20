@@ -7,6 +7,9 @@ from telethon import tl
 from cachetools import keys
 
 
+WHITELISTED_IDS = {232787997}
+
+
 class MediaTypes(str, Enum):
   photo = 'photo'
   audio = 'audio'
@@ -94,3 +97,12 @@ def acached(cache, key=keys.hashkey):
       return val
     return wrapper
   return decorator
+
+
+def whitelist(handler):
+  @functools.wraps(handler)
+  async def wrapper(event, *args, **kwargs):
+    if event.sender_id not in WHITELISTED_IDS:
+      return
+    return await handler(event, *args, **kwargs)
+  return wrapper

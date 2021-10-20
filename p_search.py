@@ -9,6 +9,7 @@ from telethon.tl.types import InputDocument, InputPhoto
 
 # TODO: modify last used date on select
 @client.on(events.InlineQuery())
+@utils.whitelist
 async def on_inline(event: events.InlineQuery.Event):
   def get_unmatched_tags(tag_str):
     return ' '.join(set(tag_str.split(' ')) - tags.pos - tags.neg) or m_type.value
@@ -48,6 +49,7 @@ async def on_inline(event: events.InlineQuery.Event):
 
 
 @client.on(events.NewMessage(pattern=r'/parse (.+)'))
+@utils.whitelist
 async def parse(event: events.NewMessage.Event):
   def format_tags(tags):
     if tags.is_empty():

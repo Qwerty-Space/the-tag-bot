@@ -36,6 +36,7 @@ async def get_media_generated_tags(file):
 
 
 @client.on(events.NewMessage())
+@utils.whitelist
 async def on_tag(event):
   m = event.message
   if not m.is_reply or m.raw_text.startswith('/'):
@@ -72,6 +73,7 @@ async def on_tag(event):
 
 
 @client.on(events.NewMessage(pattern=r'/mytags ?(.*)'))
+@utils.whitelist
 async def my_tags(event: events.NewMessage.Event):
   type_str = event.pattern_match.group(1) or utils.MediaTypes.sticker.value
   m_type = await db.get_corrected_media_type(type_str)
