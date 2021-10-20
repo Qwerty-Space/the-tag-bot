@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from collections import OrderedDict
+from itertools import chain
 
 from buildpg import asyncpg, V, Func, RawDangerous
 from cachetools import LRUCache
@@ -23,14 +24,17 @@ async def set_media_tags(
   id: int, owner: int, access_hash: int,
   m_type: MediaTypes, title: str, metatags: str, tags: str
 ):
-  await pool.execute_b(
+  old_tags = await pool.fetchval_b(
     '''
     INSERT INTO media
     (id, owner, access_hash, type, title, metatags, tags) VALUES
       (:id, :owner, :access_hash, :type, :title, :metatags, :tags)
     ON CONFLICT (id, owner) DO UPDATE
     SET access_hash = :access_hash, type = :type, title = :title,
-      metatags = :metatags, tags = :tags;
+      metatags = :metatags, tags = :tags
+    RETURNING (
+      SELECT all_tags FROM media t WHERE id = media.id AND owner = media.owner
+    );
     ''',
     id=id, owner=owner, access_hash=access_hash,
     type=m_type.value, title=title, metatags=metatags, tags=tags
@@ -40,8 +44,14 @@ async def set_media_tags(
   for tag in tags.split(' '):
     key = (owner, m_type, tag)
     out_tag = corrected_tag_cache.get(key)
-    if tag != out_tag:
+    if out_tag and tag != out_tag:
       del corrected_tag_cache[key]
+  # drop all deleted tags
+  all_old_tags = set((old_tags or '').split(' '))
+  all_new_tags = set(chain(metatags.split(' '), tags.split(' ')))
+  for tag in (all_old_tags - all_new_tags):
+    key = (owner, m_type, tag)
+    corrected_tag_cache.pop(key, None)
 
 
 async def get_media_tags(id: int, owner: int):
