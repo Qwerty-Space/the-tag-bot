@@ -1,5 +1,6 @@
 import os
 import mimetypes
+from collections import defaultdict
 
 from telethon import events, tl
 
@@ -98,8 +99,12 @@ async def my_tags(event: events.NewMessage.Event):
     )
     return
 
+  group_by_count = defaultdict(list)
+  for r in rows:
+    group_by_count[r['count']].append(r['name'])
+
   out_text = '\n'.join(
-    f"{r['name']} ({r['count']})" for r in rows
+    f"({count}) {' '.join(names)}" for count, names in group_by_count.items()
   )
   await event.reply(
     f'Your tags for "t:{m_type.value}":\n{out_text}',
