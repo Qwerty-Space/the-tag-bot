@@ -57,7 +57,7 @@ async def on_inline(event: events.InlineQuery.Event):
     )
   await event.answer(
     [get_result(r) for r in rows],
-    cache_time=5,
+    cache_time=0 if dropped else 5,
     private=True,
     next_offset=f'{offset + 1}' if len(rows) >= 50 else None,
     switch_pm=f'{len(dropped)} tags dropped' if dropped else None,
