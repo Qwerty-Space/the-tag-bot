@@ -42,7 +42,7 @@ async def get_media_generated_tags(file):
 @utils.whitelist
 async def on_tag(event):
   m = event.message
-  if not m.is_reply or m.raw_text.startswith('/'):
+  if m.raw_text.startswith('/'):
     return
   reply = await event.get_reply_message()
   if not reply.media:
@@ -83,7 +83,7 @@ async def my_tags(event: events.NewMessage.Event):
   m_type = None
 
   reply = await event.get_reply_message()
-  if reply:
+  if reply.media:
     m_type = utils.get_media_type(reply.file.media)
   else:
     m_type = await db.get_corrected_media_type(type_str)
