@@ -34,7 +34,7 @@ async def get_media_generated_tags(file):
     if file_ext:
       ext = file_ext
   tags.append(f"e:{ext.lstrip('.')}")
-  return utils.get_media_type(file.media), file_title, ' '.join(tags)
+  return file_title, ' '.join(tags)
 
 
 @client.on(events.NewMessage())
@@ -46,7 +46,8 @@ async def on_tag(event):
   reply = await event.get_reply_message()
   if not reply.media:
     return
-  if not isinstance(reply.media, (tl.types.MessageMediaDocument, tl.types.MessageMediaPhoto)):
+  m_type = utils.get_media_type(reply.file.media)
+  if not m_type:
     await event.respond("I don't know how to handle that media type yet!")
     return
   file_id, access_hash = reply.file.media.id, reply.file.media.access_hash
@@ -58,7 +59,7 @@ async def on_tag(event):
   old_tags = set(old_tags.split(' ')) if old_tags else set()
 
   new_tags = ' '.join((old_tags | tags.pos) - tags.neg)
-  m_type, title, metatags = await get_media_generated_tags(reply.file)
+  title, metatags = await get_media_generated_tags(reply.file)
   await db.set_media_tags(
     id=file_id,
     owner=m.sender_id,
@@ -78,20 +79,29 @@ async def on_tag(event):
 @utils.whitelist
 async def my_tags(event: events.NewMessage.Event):
   type_str = event.pattern_match.group(1) or utils.MediaTypes.sticker.value
-  m_type = await db.get_corrected_media_type(type_str)
-  if not my_tags:
+  m_type = None
+
+  reply = await event.get_reply_message()
+  if reply:
+    m_type = utils.get_media_type(reply.file.media)
+  else:
+    m_type = await db.get_corrected_media_type(type_str)
+
+  if not m_type:
     await event.reply('I don\'t understand what that type refers to!')
     return
 
   rows = await db.get_user_tags_for_type(event.sender_id, m_type)
   if not rows:
-    await event.reply('You have not tagged any media of that type.')
+    await event.reply(
+      f'You have not tagged any media of type "t:{m_type.value}"".'
+    )
     return
 
   out_text = '\n'.join(
     f"{r['name']} ({r['count']})" for r in rows
   )
   await event.reply(
-    f'Your tags for t:{m_type.value}:\n{out_text}',
+    f'Your tags for "t:{m_type.value}":\n{out_text}',
     parse_mode=None
   )

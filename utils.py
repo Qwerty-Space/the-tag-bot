@@ -23,6 +23,7 @@ class MediaTypes(str, Enum):
 def get_media_type(media):
   if isinstance(media, tl.types.Photo):
     return MediaTypes.photo
+
   if isinstance(media, tl.types.Document):
     attr_types = {type(attr): attr for attr in media.attributes}
 
@@ -40,7 +41,7 @@ def get_media_type(media):
     if tl.types.DocumentAttributeSticker in attr_types:
       return MediaTypes.sticker
 
-  return MediaTypes.file
+    return MediaTypes.file
 
 
 @dataclass
