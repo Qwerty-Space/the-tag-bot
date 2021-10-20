@@ -80,7 +80,7 @@ async def parse(event: events.NewMessage.Event, query=None):
 
   m_type, tags, dropped = await db.get_corrected_user_tags(event.sender_id, tags)
   if m_type:
-    out_text += f'\ncorrected: <t:{m_type.value}> {format_tags(tags)}'
+    out_text += f'\ncorrected: [t:{m_type.value}] {format_tags(tags)}'
   else:
     out_text += '\ncorrected: [error] (unable to infer type)'
 
