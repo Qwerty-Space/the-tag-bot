@@ -73,8 +73,10 @@ async def parse(event: events.NewMessage.Event, query=None):
       return '[no tags]'
     return ' '.join(chain(tags.pos, (f'!{tag}' for tag in tags.neg)))
 
-  tags = utils.parse_tags(query or event.pattern_match.group(1))
-  out_text = f'parsed: <t:{tags.type}> {format_tags(tags)}'
+  query = query or event.pattern_match.group(1)
+  tags = utils.parse_tags(query)
+  out_text = f'input: {query}'
+  out_text += f'\nparsed: <t:{tags.type}> {format_tags(tags)}'
 
   m_type, tags, dropped = await db.get_corrected_user_tags(event.sender_id, tags)
   if m_type:
