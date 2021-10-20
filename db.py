@@ -35,6 +35,13 @@ async def set_media_tags(
     id=id, owner=owner, access_hash=access_hash,
     type=m_type.value, title=title, metatags=metatags, tags=tags
   )
+  # prevent any tags that have just been created from being corrected to
+  # old (previously correct) values
+  for tag in tags.split(' '):
+    key = (owner, m_type, tag)
+    out_tag = corrected_tag_cache.get(key)
+    if tag != out_tag:
+      del corrected_tag_cache[key]
 
 
 async def get_media_tags(id: int, owner: int):
