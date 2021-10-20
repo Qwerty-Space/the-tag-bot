@@ -17,6 +17,8 @@ async def get_media_generated_tags(file):
   pack = await p_cached.get_sticker_pack(file.sticker_set)
   if pack:
     tags.append(utils.sanitise_tag(f'g:{pack.title}'))
+  elif isinstance(file.sticker_set, tl.types.InputStickerSetEmpty):
+    tags.append('g:none')
 
   ext = mimetypes.guess_extension(file.mime_type)
 
