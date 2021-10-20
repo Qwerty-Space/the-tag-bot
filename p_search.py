@@ -24,7 +24,8 @@ async def on_inline(event: events.InlineQuery.Event):
     )
     return
 
-  rows = await db.search_user_media(user_id, m_type, tags)
+  offset = int(event.offset or 0)
+  rows = await db.search_user_media(user_id, m_type, tags, offset)
   result_type = {
     # 'audio' only works for audio/mpeg, thanks durov
     utils.MediaTypes.audio: utils.MediaTypes.file
@@ -45,6 +46,7 @@ async def on_inline(event: events.InlineQuery.Event):
     [get_result(r) for r in rows],
     cache_time=0,
     private=True,
+    next_offset=f'{offset + 1}' if len(rows) >= 50 else None
   )
 
 

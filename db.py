@@ -44,7 +44,9 @@ async def get_user_tags_for_type(owner: int, m_type: MediaTypes):
   )
 
 
-async def search_user_media(owner: int, m_type: MediaTypes, tags: ParsedTags):
+async def search_user_media(
+  owner: int, m_type: MediaTypes, tags: ParsedTags, offset=0
+):
   space_split = lambda s1: Func('string_to_array', s1, RawDangerous("' '"))
   all_tags_split = lambda: space_split(V('all_tags'))
 
@@ -57,9 +59,10 @@ async def search_user_media(owner: int, m_type: MediaTypes, tags: ParsedTags):
   return await pool.fetch_b(
     '''
     SELECT id, access_hash, title, all_tags FROM media
-    WHERE :where ORDER BY last_used_at DESC
+    WHERE :where ORDER BY last_used_at DESC LIMIT 50 OFFSET :offset
     ''',
-    where=where_logic
+    where=where_logic,
+    offset=offset * 50
   )
 
 
