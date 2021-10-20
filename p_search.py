@@ -76,13 +76,13 @@ async def parse(event: events.NewMessage.Event, query=None):
   query = query or event.pattern_match.group(1)
   tags = utils.parse_tags(query)
   out_text = f'input: {query}'
-  out_text += f'\nparsed: <t:{tags.type}> {format_tags(tags)}'
+  out_text += f'\nparsed: [t:{tags.type}] {format_tags(tags)}'
 
   m_type, tags, dropped = await db.get_corrected_user_tags(event.sender_id, tags)
   if m_type:
     out_text += f'\ncorrected: <t:{m_type.value}> {format_tags(tags)}'
   else:
-    out_text += '\ncorrected: <error> (unable to infer type)'
+    out_text += '\ncorrected: [error] (unable to infer type)'
 
   if dropped:
     out_text += '\n\ndropped:'

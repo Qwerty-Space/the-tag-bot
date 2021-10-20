@@ -44,6 +44,12 @@ def get_media_type(media):
     return MediaTypes.file
 
 
+def html_format_tags(tags):
+  if isinstance(tags, str):
+    tags = tags.split(' ')
+  return ' '.join(f'<code>{tag}</code>' for tag in tags)
+
+
 @dataclass
 class ParsedTags:
   type: str = ''

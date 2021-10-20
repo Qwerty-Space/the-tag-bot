@@ -38,6 +38,13 @@ async def set_media_tags(
 
 
 async def get_media_tags(id: int, owner: int):
+  return await pool.fetchrow_b(
+    'SELECT metatags, tags FROM media WHERE id = :id AND owner = :owner',
+    id=id, owner=owner
+  )
+
+
+async def get_media_user_tags(id: int, owner: int):
   return await pool.fetchval_b(
     'SELECT tags FROM media WHERE id = :id AND owner = :owner',
     id=id, owner=owner

@@ -1,12 +1,31 @@
 import os
 import mimetypes
 from collections import defaultdict
+import functools
 
 from telethon import events, tl
+from telethon.network import mtprotosender
 
 from proxy_globals import client
 import p_cached
 import db, utils
+
+
+def extract_taggable_media(handler):
+  @functools.wraps(handler)
+  async def wrapper(event, *args, **kwargs):
+    reply = await event.get_reply_message()
+    m_type = utils.get_media_type(reply.file.media) if reply else None
+    return await handler(event, reply=reply, m_type=m_type, *args, **kwargs)
+  return wrapper
+
+
+def format_tags(media_name, m_type, metatags, tags):
+  return (
+    f'Tags for {media_name}:'
+    f'\nmeta: [t:{m_type.value}] {utils.html_format_tags(metatags)}'
+    f'\n{utils.html_format_tags(tags)}'
+  )
 
 
 async def get_media_generated_tags(file):
@@ -40,14 +59,13 @@ async def get_media_generated_tags(file):
 
 @client.on(events.NewMessage())
 @utils.whitelist
-async def on_tag(event):
+@extract_taggable_media
+async def on_tag(event, reply, m_type):
   m = event.message
   if m.raw_text.startswith('/'):
     return
-  reply = await event.get_reply_message()
-  if not reply.media:
+  if not reply or not reply.media:
     return
-  m_type = utils.get_media_type(reply.file.media)
   if not m_type:
     await event.respond("I don't know how to handle that media type yet!")
     return
@@ -56,7 +74,7 @@ async def on_tag(event):
   tags = utils.parse_tags(m.raw_text)
   if tags.is_empty():
     return
-  old_tags = await db.get_media_tags(file_id, m.sender_id)
+  old_tags = await db.get_media_user_tags(file_id, m.sender_id)
   old_tags = set(old_tags.split(' ')) if old_tags else set()
 
   new_tags = ' '.join((old_tags | tags.pos) - tags.neg)
@@ -71,25 +89,21 @@ async def on_tag(event):
     tags=new_tags
   )
   await event.reply(
-    f'Tags for {file_id}:\n[meta] <t:{m_type.value}> {metatags}\n{new_tags}',
-    parse_mode=None
+    format_tags(file_id, m_type, metatags, new_tags),
+    parse_mode='HTML'
   )
 
 
 @client.on(events.NewMessage(pattern=r'/mytags ?(.*)'))
 @utils.whitelist
-async def my_tags(event: events.NewMessage.Event):
+@extract_taggable_media
+async def my_tags(event: events.NewMessage.Event, reply, m_type):
   type_str = event.pattern_match.group(1) or utils.MediaTypes.sticker.value
-  m_type = None
-
-  reply = await event.get_reply_message()
-  if reply.media:
-    m_type = utils.get_media_type(reply.file.media)
-  else:
+  if not m_type:
     m_type = await db.get_corrected_media_type(type_str)
 
   if not m_type:
-    await event.reply('I don\'t understand what that type refers to!')
+    await event.reply('I don\'t understand what type of media that is!')
     return
 
   rows = await db.get_user_tags_for_type(event.sender_id, m_type)
@@ -109,4 +123,24 @@ async def my_tags(event: events.NewMessage.Event):
   await event.reply(
     f'Your tags for "t:{m_type.value}":\n{out_text}',
     parse_mode=None
+  )
+
+
+@client.on(events.NewMessage(pattern=r'/showtags$'))
+@utils.whitelist
+@extract_taggable_media
+async def show_tags(event: events.NewMessage.Event, reply, m_type):
+  if not m_type:
+    await event.reply('Reply to media to use this command.')
+    return
+
+  file_id = reply.file.media.id
+  row = await db.get_media_tags(file_id, event.sender_id)
+  if not row:
+    await event.reply('No tags found.')
+    return
+
+  await event.reply(
+    format_tags(file_id, m_type, row['metatags'], row['tags']),
+    parse_mode='HTML'
   )

@@ -4,6 +4,7 @@ from collections import OrderedDict
 from telethon import events
 
 from proxy_globals import client
+import utils
 import p_cached
 
 
@@ -27,7 +28,7 @@ async def on_emoji_tags(event):
   if not keywords:
     return await event.reply('No keywords found.')
   await event.reply(
-    '\n'.join(f'{k} <code>{v}</code>' for k, v in keywords.items()),
+    '\n'.join(f'{k} {utils.html_format_tags(v)}' for k, v in keywords.items()),
     parse_mode='HTML'
   )
 
@@ -52,6 +53,6 @@ async def on_emoji_tags_from_sticker(event):
     return await event.reply("I don't have any keywords for that emoji")
 
   await event.reply(
-    '\n'.join(f'{k} <code>{v}</code>' for k, v in keywords.items()),
+    '\n'.join(f'{k} {utils.html_format_tags(v)}' for k, v in keywords.items()),
     parse_mode='HTML'
   )
