@@ -3,7 +3,7 @@ RETURNS TEXT IMMUTABLE AS $$
   SELECT array_to_string($1, ' ')
 $$ language sql;
 
-CREATE TABLE IF NOT EXISTS media (
+CREATE TABLE media (
   id BIGINT NOT NULL,
   owner BIGINT NOT NULL,
   PRIMARY KEY (id, owner),
@@ -19,11 +19,11 @@ CREATE TABLE IF NOT EXISTS media (
   last_used_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS index_media_all_tags_on_split ON media USING gin (string_to_array(all_tags, ' '));
+CREATE INDEX index_media_all_tags_on_split ON media USING gin (string_to_array(all_tags, ' '));
 ALTER INDEX index_media_all_tags_on_split ALTER COLUMN 1 SET STATISTICS 3000;
 
 
-CREATE TABLE IF NOT EXISTS tags (
+CREATE TABLE tags (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   owner BIGINT NOT NULL DEFAULT 0,
@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS tags (
   count INTEGER NOT NULL DEFAULT 1,
   UNIQUE(name, owner, type)
 );
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-CREATE INDEX IF NOT EXISTS index_tags_on_name_trgm ON tags USING gist (name gist_trgm_ops);
+CREATE EXTENSION pg_trgm WITH SCHEMA public;
+CREATE INDEX index_tags_on_name_trgm ON tags USING gist (name gist_trgm_ops);
 
 
 CREATE OR REPLACE FUNCTION split_tags(a TEXT)
@@ -105,8 +105,6 @@ END
 $$
 LANGUAGE PLPGSQL;
 
-DROP TRIGGER IF EXISTS trigger_media_tags ON media;
-
 CREATE TRIGGER trigger_media_tags
 AFTER INSERT OR UPDATE OR DELETE
 ON media 
@@ -121,8 +119,6 @@ BEGIN
 END
 $$
 LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trigger_delete_zero_count_tags ON tags;
 
 CREATE TRIGGER trigger_delete_zero_count_tags
 AFTER UPDATE ON tags
