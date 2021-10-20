@@ -49,7 +49,12 @@ class ParsedTags:
 
 
 def sanitise_tag(tag):
-  return re.sub(r'[^\w:]', '_', tag.lower().replace("'", '')).strip('_')
+  tag = re.sub(r'[^\w:]', '_', tag.lower().replace("'", '')).strip('_')
+  prefix_match = re.match(r'(\w+?):(.+)$', tag)
+  if prefix_match:
+    tag = f'{prefix_match[1]}:{prefix_match[2].replace(":", "_")}'
+  tag = re.sub(r'_{2,}', '_', tag)
+  return tag
 
 
 def parse_tags(tags):
