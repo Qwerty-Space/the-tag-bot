@@ -4,10 +4,14 @@ from telethon import events, tl
 
 from proxy_globals import client
 import db, utils
-from telethon.tl.types import InputDocument, InputPhoto
+from telethon.tl.types import InputDocument, InputPhoto, UpdateBotInlineSend
 
 
-# TODO: modify last used date on select
+@client.on(events.Raw(UpdateBotInlineSend))
+async def on_inline_selected(event):
+  await db.update_last_used(event.user_id, int(event.id))
+
+
 @client.on(events.InlineQuery())
 @utils.whitelist
 async def on_inline(event: events.InlineQuery.Event):
@@ -33,18 +37,22 @@ async def on_inline(event: events.InlineQuery.Event):
 
   builder = event.builder
   if m_type == utils.MediaTypes.photo:
-    get_result = lambda r: builder.photo(InputPhoto(r['id'], r['access_hash'], b''))
+    get_result = lambda r: builder.photo(
+      id=str(r['id']),
+      file=InputPhoto(r['id'], r['access_hash'], b'')
+    )
   else:
     get_result = (
       lambda r: builder.document(
-        InputDocument(r['id'], r['access_hash'], b''),
+        id=str(r['id']),
+        file=InputDocument(r['id'], r['access_hash'], b''),
         type=result_type,
         title=r['title'] or get_unmatched_tags(r['all_tags'])
       )
     )
   await event.answer(
     [get_result(r) for r in rows],
-    cache_time=0,
+    cache_time=5,
     private=True,
     next_offset=f'{offset + 1}' if len(rows) >= 50 else None
   )

@@ -39,10 +39,17 @@ async def get_media_tags(id: int, owner: int):
 async def get_user_tags_for_type(owner: int, m_type: MediaTypes):
   return await pool.fetch_b(
     '''SELECT name, count FROM tags WHERE
-    owner = :owner and type = :type ORDER BY count DESC''',
+    owner = :owner AND type = :type ORDER BY count DESC''',
     owner=owner, type=m_type.value
   )
 
+
+async def update_last_used(owner: int, id: int):
+  return await pool.execute_b(
+    '''UPDATE media SET last_used_at = CURRENT_TIMESTAMP WHERE
+    owner = :owner AND id = :id''',
+    owner=owner, id=id
+  )
 
 async def search_user_media(
   owner: int, m_type: MediaTypes, tags: ParsedTags, offset=0
