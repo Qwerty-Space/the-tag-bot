@@ -40,6 +40,9 @@ async def get_media_generated_tags(file):
 
 @client.on(events.InlineQuery())
 async def on_inline(event: events.InlineQuery.Event):
+  def get_unmatched_tags(tag_str):
+    return ' '.join(set(tag_str.split(' ')) - tags.pos - tags.neg) or m_type.value
+
   user_id = event.query.user_id
   tags = utils.parse_tags(event.text)
   m_type, tags = await db.get_corrected_user_tags(user_id, tags)
@@ -62,7 +65,9 @@ async def on_inline(event: events.InlineQuery.Event):
   else:
     get_result = (
       lambda r: builder.document(
-        InputDocument(r['id'], r['access_hash'], b''), type=result_type, title=r['title']
+        InputDocument(r['id'], r['access_hash'], b''),
+        type=result_type,
+        title=r['title'] or get_unmatched_tags(r['all_tags'])
       )
     )
   await event.answer(

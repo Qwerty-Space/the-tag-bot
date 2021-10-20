@@ -56,7 +56,7 @@ async def search_user_media(owner: int, m_type: MediaTypes, tags: ParsedTags):
 
   return await pool.fetch_b(
     '''
-    SELECT id, access_hash, title FROM media
+    SELECT id, access_hash, title, all_tags FROM media
     WHERE :where ORDER BY last_used_at DESC
     ''',
     where=where_logic

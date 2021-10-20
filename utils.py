@@ -7,10 +7,10 @@ from telethon import tl
 from cachetools import keys
 
 
-# audio, file (needs test!), gif, photo, sticker, video, voice?
 class MediaTypes(str, Enum):
   photo = 'photo'
   audio = 'audio'
+  voice = 'voice'
   gif = 'gif'
   video = 'video'
   sticker = 'sticker'
@@ -23,6 +23,8 @@ def get_media_type(media):
   if isinstance(media, tl.types.Document):
     for attr in media.attributes:
       if isinstance(attr, tl.types.DocumentAttributeAudio):
+        if attr.voice:
+          return MediaTypes.voice
         return MediaTypes.audio
       if isinstance(attr, tl.types.DocumentAttributeAnimated):
         return MediaTypes.gif
