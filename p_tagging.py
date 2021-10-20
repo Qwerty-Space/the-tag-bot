@@ -94,7 +94,7 @@ async def on_tag(event, reply, m_type):
   )
 
 
-@client.on(events.NewMessage(pattern=r'/mytags ?(.*)'))
+@client.on(events.NewMessage(pattern=r'/type_tags ?(.*)'))
 @utils.whitelist
 @extract_taggable_media
 async def my_tags(event: events.NewMessage.Event, reply, m_type):
@@ -126,7 +126,7 @@ async def my_tags(event: events.NewMessage.Event, reply, m_type):
   )
 
 
-@client.on(events.NewMessage(pattern=r'/showtags$'))
+@client.on(events.NewMessage(pattern=r'/show_tags$'))
 @utils.whitelist
 @extract_taggable_media
 async def show_tags(event: events.NewMessage.Event, reply, m_type):
