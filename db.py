@@ -1,5 +1,6 @@
 import logging
-import itertools
+from dataclasses import dataclass
+from collections import OrderedDict
 
 from buildpg import asyncpg, V, Func, RawDangerous
 from cachetools import LRUCache
@@ -9,6 +10,13 @@ from utils import ParsedTags, MediaTypes, acached
 pool: asyncpg.BuildPgPool
 logger = logging.getLogger('db')
 TAG_DIFF_MAX = 0.7
+
+corrected_tag_cache = LRUCache(4096)
+@dataclass
+class SearchTag:
+  in_name: str
+  is_pos: bool
+  out_name: str = None
 
 
 async def set_media_tags(
@@ -92,42 +100,59 @@ async def get_corrected_media_type(search_val: str):
   return None
 
 
-# TODO: cache each corrected tag (per user and type)
 async def get_corrected_user_tags(owner: int, tags: ParsedTags):
   m_type = await get_corrected_media_type(tags.type)
   if not m_type:
     # No point correcting tags if we don't know what type to look for
     return m_type, None
 
-  num_positive = len(tags.pos)
-  tag_str = ' '.join(itertools.chain(tags.pos, tags.neg))
-  res = await pool.fetch_b(
-    '''
-    SELECT * FROM UNNEST(string_to_array(:tag_str, ' ')) search_tag,
-    LATERAL (
-      SELECT name AS match, name <-> search_tag AS dist
-      FROM tags WHERE owner = :owner AND type = :m_type ORDER BY dist LIMIT 1
-    ) AS s;
-    ''',
-    owner=owner, m_type=m_type, tag_str=tag_str
-  )
-  pos = res[:num_positive]
-  neg = res[num_positive:]
-
+  get_cache_key = lambda name: (owner, m_type, name)
+  iter_resolved = lambda: (t for t in resolved_tags.values() if t.out_name)
   tag_matches = (
     lambda r:
     r['dist'] <= TAG_DIFF_MAX
     or (len(r['search_tag']) >= 4 and r['search_tag'] in r['match'])
   )
-  good = ParsedTags(
+
+  # Pull tags from cache
+  resolved_tags = OrderedDict(((v, SearchTag(v, True)) for v in tags.pos))
+  resolved_tags.update(((v, SearchTag(v, False)) for v in tags.neg))
+  for tag in resolved_tags.values():
+    tag.out_name = corrected_tag_cache.get(get_cache_key(tag.in_name), None)
+
+  # Query unresolved tags
+  fetch_tags = [name for name, tag in resolved_tags.items() if not tag.out_name]
+  if fetch_tags:
+    res = await pool.fetch_b(
+      '''
+      SELECT * FROM UNNEST(string_to_array(:tag_str, ' ')) search_tag,
+      LATERAL (
+        SELECT name AS match, name <-> search_tag AS dist
+        FROM tags WHERE owner = :owner AND type = :m_type ORDER BY dist LIMIT 1
+      ) AS s;
+      ''',
+      owner=owner, m_type=m_type, tag_str=' '.join(fetch_tags)
+    )
+
+    assert len(res) == len(fetch_tags)
+
+    for in_name, row in zip(fetch_tags, res):
+      if tag_matches(row):
+        resolved_tags[in_name].out_name = row['match']
+
+  # Cache results
+  for tag in iter_resolved():
+    corrected_tag_cache[get_cache_key(tag.in_name)] = tag.out_name
+
+  ret_tags = ParsedTags(
     m_type.value,
-    set(r['match'] for r in pos if tag_matches(r)),
-    set(r['match'] for r in neg if tag_matches(r))
+    set(t.out_name for t in iter_resolved() if t.is_pos),
+    set(t.out_name for t in iter_resolved() if not t.is_pos)
   )
   # TODO: return this in some kind of hint wrapper
   # bad = [r for r in itertools.chain(pos, neg) if not tag_matches(r)]
 
-  return m_type, good
+  return m_type, ret_tags
 
 
 async def init():
