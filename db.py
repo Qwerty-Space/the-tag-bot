@@ -104,7 +104,7 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
   m_type = await get_corrected_media_type(tags.type)
   if not m_type:
     # No point correcting tags if we don't know what type to look for
-    return m_type, None
+    return m_type, None, []
 
   get_cache_key = lambda name: (owner, m_type, name)
   iter_resolved = lambda: (t for t in resolved_tags.values() if t.out_name)
@@ -122,6 +122,7 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
 
   # Query unresolved tags
   fetch_tags = [name for name, tag in resolved_tags.items() if not tag.out_name]
+  dropped = []
   if fetch_tags:
     res = await pool.fetch_b(
       '''
@@ -139,6 +140,8 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
     for in_name, row in zip(fetch_tags, res):
       if tag_matches(row):
         resolved_tags[in_name].out_name = row['match']
+      else:
+        dropped.append(row)
 
   # Cache results
   for tag in iter_resolved():
@@ -149,10 +152,8 @@ async def get_corrected_user_tags(owner: int, tags: ParsedTags):
     set(t.out_name for t in iter_resolved() if t.is_pos),
     set(t.out_name for t in iter_resolved() if not t.is_pos)
   )
-  # TODO: return this in some kind of hint wrapper
-  # bad = [r for r in itertools.chain(pos, neg) if not tag_matches(r)]
 
-  return m_type, ret_tags
+  return m_type, ret_tags, dropped
 
 
 async def init():

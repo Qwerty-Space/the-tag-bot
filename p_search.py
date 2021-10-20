@@ -1,10 +1,14 @@
 from itertools import chain
+from cachetools import LRUCache
 
-from telethon import events, tl
+from telethon import events
 
 from proxy_globals import client
 import db, utils
 from telethon.tl.types import InputDocument, InputPhoto, UpdateBotInlineSend
+
+
+last_query_cache = LRUCache(128)
 
 
 @client.on(events.Raw(UpdateBotInlineSend))
@@ -19,12 +23,13 @@ async def on_inline(event: events.InlineQuery.Event):
     return ' '.join(set(tag_str.split(' ')) - tags.pos - tags.neg) or m_type.value
 
   user_id = event.query.user_id
+  last_query_cache[user_id] = event.text
   tags = utils.parse_tags(event.text)
-  m_type, tags = await db.get_corrected_user_tags(user_id, tags)
+  m_type, tags, dropped = await db.get_corrected_user_tags(user_id, tags)
   if not m_type:
     await event.answer(
       switch_pm='Failed to parse media type',
-      switch_pm_param='parse' # TODO: make this work
+      switch_pm_param='parse'
     )
     return
 
@@ -54,31 +59,42 @@ async def on_inline(event: events.InlineQuery.Event):
     [get_result(r) for r in rows],
     cache_time=5,
     private=True,
-    next_offset=f'{offset + 1}' if len(rows) >= 50 else None
+    next_offset=f'{offset + 1}' if len(rows) >= 50 else None,
+    switch_pm=f'{len(dropped)} tags dropped' if dropped else None,
+    switch_pm_param='parse'
   )
 
 
 @client.on(events.NewMessage(pattern=r'/parse (.+)'))
 @utils.whitelist
-async def parse(event: events.NewMessage.Event):
+async def parse(event: events.NewMessage.Event, query=None):
   def format_tags(tags):
     if tags.is_empty():
       return '[no tags]'
     return ' '.join(chain(tags.pos, (f'!{tag}' for tag in tags.neg)))
 
-  tags = utils.parse_tags(event.pattern_match.group(1))
+  tags = utils.parse_tags(query or event.pattern_match.group(1))
   out_text = f'parsed: <t:{tags.type}> {format_tags(tags)}'
 
-  m_type, tags = await db.get_corrected_user_tags(event.sender_id, tags)
+  m_type, tags, dropped = await db.get_corrected_user_tags(event.sender_id, tags)
   if m_type:
     out_text += f'\ncorrected: <t:{m_type.value}> {format_tags(tags)}'
   else:
     out_text += '\ncorrected: <error> (unable to infer type)'
 
-  # TODO: fix
-  # if dropped:
-  #   out_text += '\n\ndropped:'
-  #   for row in dropped:
-  #     out_text += f"\n{row['search_tag']} ≉ {row['match']} (Δ={round(row['dist'] * 100)}%)"
+  if dropped:
+    out_text += '\n\ndropped:'
+    for row in dropped:
+      out_text += f"\n{row['search_tag']} ≉ {row['match']} (Δ={round(row['dist'] * 100)}%)"
 
   await event.reply(out_text, parse_mode=None)
+
+
+@client.on(events.NewMessage(pattern=r'/start parse$'))
+@utils.whitelist
+async def parse_from_start(event: events.NewMessage.Event):
+  query = last_query_cache.get(event.sender_id, None)
+  if not query:
+    await event.respond('No previous query found.')
+    return
+  await parse(event, query)
