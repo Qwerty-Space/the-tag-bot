@@ -21,6 +21,7 @@ async def main():
 
   proxy_globals.client = client
   importlib.import_module('p_tagging')
+  importlib.import_module('p_search')
   importlib.import_module('p_cached')
   importlib.import_module('p_emoji_tag_suggester')
 
