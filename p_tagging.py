@@ -144,3 +144,16 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type):
     format_tags(file_id, m_type, row['metatags'], row['tags']),
     parse_mode='HTML'
   )
+
+
+@client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
+@utils.whitelist
+@extract_taggable_media
+async def show_tags(event: events.NewMessage.Event, reply, m_type):
+  if not m_type:
+    await event.reply('Reply to media to use this command.')
+    return
+
+  file_id = reply.file.media.id
+  deleted_id = await db.delete_media(file_id, event.sender_id)
+  await event.reply('Media deleted.' if deleted_id else 'Media not found.')

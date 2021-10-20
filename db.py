@@ -52,6 +52,11 @@ async def set_media_tags(
     key = (owner, m_type, tag)
     corrected_tag_cache.pop(key, None)
 
+async def delete_media(id: int, owner: int):
+  return await pool.fetchval_b(
+    'DELETE FROM media WHERE id = :id AND owner = :owner RETURNING *',
+    id=id, owner=owner
+  )
 
 async def get_media_tags(id: int, owner: int):
   return await pool.fetchrow_b(
