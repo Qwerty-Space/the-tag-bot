@@ -24,17 +24,22 @@ def get_media_type(media):
   if isinstance(media, tl.types.Photo):
     return MediaTypes.photo
   if isinstance(media, tl.types.Document):
-    for attr in media.attributes:
-      if isinstance(attr, tl.types.DocumentAttributeAudio):
-        if attr.voice:
-          return MediaTypes.voice
-        return MediaTypes.audio
-      if isinstance(attr, tl.types.DocumentAttributeAnimated):
-        return MediaTypes.gif
-      if isinstance(attr, tl.types.DocumentAttributeVideo):
-        return MediaTypes.video
-      if isinstance(attr, tl.types.DocumentAttributeSticker):
-        return MediaTypes.sticker
+    attr_types = {type(attr): attr for attr in media.attributes}
+
+    if tl.types.DocumentAttributeAudio in attr_types:
+      if attr_types[tl.types.DocumentAttributeAudio].voice:
+        return MediaTypes.voice
+      return MediaTypes.audio
+
+    if tl.types.DocumentAttributeAnimated in attr_types:
+      return MediaTypes.gif
+
+    if tl.types.DocumentAttributeVideo in attr_types:
+      return MediaTypes.video
+
+    if tl.types.DocumentAttributeSticker in attr_types:
+      return MediaTypes.sticker
+
   return MediaTypes.file
 
 
