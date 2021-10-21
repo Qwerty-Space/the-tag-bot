@@ -138,3 +138,25 @@ BEGIN
 END
 $$
 LANGUAGE PLPGSQL
+
+
+
+CREATE OR REPLACE FUNCTION check_user_media_count() RETURNS TRIGGER AS
+$$
+DECLARE
+	media_count INTEGER;
+BEGIN
+	SELECT INTO media_count COUNT(*) FROM media
+	  WHERE owner = NEW.owner;
+	IF media_count >= 1000 THEN
+		RAISE EXCEPTION 'Only 1000 media allowed per user';
+	END IF;
+	RETURN NEW;
+END
+$$
+LANGUAGE PLPGSQL
+
+
+CREATE TRIGGER trigger_check_user_media_count
+BEFORE INSERT ON media
+FOR EACH ROW EXECUTE PROCEDURE check_user_media_count();

@@ -3,6 +3,7 @@ import mimetypes
 from collections import defaultdict
 import functools
 
+import asyncpg
 from telethon import events, tl
 from telethon.network import mtprotosender
 
@@ -79,19 +80,22 @@ async def on_tag(event, reply, m_type):
 
   new_tags = ' '.join((old_tags | tags.pos) - tags.neg)
   title, metatags = await get_media_generated_tags(reply.file)
-  await db.set_media_tags(
-    id=file_id,
-    owner=m.sender_id,
-    access_hash=access_hash,
-    m_type=m_type,
-    title=title,
-    metatags=metatags,
-    tags=new_tags
-  )
-  await event.reply(
-    format_tags(file_id, m_type, metatags, new_tags),
-    parse_mode='HTML'
-  )
+  try:
+    await db.set_media_tags(
+      id=file_id,
+      owner=m.sender_id,
+      access_hash=access_hash,
+      m_type=m_type,
+      title=title,
+      metatags=metatags,
+      tags=new_tags
+    )
+    await event.reply(
+      format_tags(file_id, m_type, metatags, new_tags),
+      parse_mode='HTML'
+    )
+  except asyncpg.exceptions.RaiseError as e:
+    await event.reply(f'Error: {e}', parse_mode=None)
 
 
 @client.on(events.NewMessage(pattern=r'/type_tags ?(.*)'))
