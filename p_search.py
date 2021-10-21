@@ -52,7 +52,7 @@ async def on_inline(event: events.InlineQuery.Event):
         id=str(r['id']),
         file=InputDocument(r['id'], r['access_hash'], b''),
         type=result_type,
-        title=r['title'] or get_unmatched_tags(r['all_tags'])
+        title=r['title'] or get_unmatched_tags(r['all_tags']) or result_type
       )
     )
   await event.answer(
