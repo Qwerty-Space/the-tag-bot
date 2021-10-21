@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from telethon import tl
 from cachetools import keys
 
+from constants import MAX_TAG_LENGTH
+
 
 WHITELISTED_IDS = {232787997}
 
@@ -78,7 +80,7 @@ def parse_tags(tags):
     if not m[2]:
       continue
     clean_tag = sanitise_tag(m[2])
-    if not clean_tag:
+    if not clean_tag or len(clean_tag) > MAX_TAG_LENGTH:
       continue
     if m[1] in {'!', '-'}:
       parsed.neg.add(clean_tag)

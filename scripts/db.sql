@@ -149,7 +149,7 @@ BEGIN
 	SELECT INTO media_count COUNT(*) FROM media
 	  WHERE owner = NEW.owner;
 	IF media_count >= 1000 THEN
-		RAISE EXCEPTION 'Only 1000 media allowed per user';
+		RAISE EXCEPTION 'Only 1000 media allowed per user!';
 	END IF;
 	RETURN NEW;
 END

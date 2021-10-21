@@ -8,6 +8,7 @@ from telethon import events, tl
 from telethon.network import mtprotosender
 
 from proxy_globals import client
+from constants import MAX_TAGS_PER_FILE
 import p_cached
 import db, utils
 
@@ -78,9 +79,12 @@ async def on_tag(event, reply, m_type):
   old_tags = await db.get_media_user_tags(file_id, m.sender_id)
   old_tags = set(old_tags.split(' ')) if old_tags else set()
 
-  new_tags = ' '.join((old_tags | tags.pos) - tags.neg)
+  new_tags = (old_tags | tags.pos) - tags.neg
   title, metatags = await get_media_generated_tags(reply.file)
   try:
+    if len(new_tags) > MAX_TAGS_PER_FILE:
+      raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags allowed per file!')
+    new_tags = ' '.join(new_tags)
     await db.set_media_tags(
       id=file_id,
       owner=m.sender_id,
@@ -94,7 +98,7 @@ async def on_tag(event, reply, m_type):
       format_tags(file_id, m_type, metatags, new_tags),
       parse_mode='HTML'
     )
-  except asyncpg.exceptions.RaiseError as e:
+  except (asyncpg.exceptions.RaiseError, ValueError) as e:
     await event.reply(f'Error: {e}', parse_mode=None)
 
 
