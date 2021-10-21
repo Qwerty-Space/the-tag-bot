@@ -5,7 +5,6 @@ import functools
 
 import asyncpg
 from telethon import events, tl
-from telethon.network import mtprotosender
 
 from proxy_globals import client
 from constants import MAX_TAGS_PER_FILE
