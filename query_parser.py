@@ -86,11 +86,7 @@ def parse_query(query):
   def set_current_field(field, span, is_neg=False):
     nonlocal current_field, current_field_start, negated_field, field_was_used
     if not field_was_used:
-      warnings.append(ParseWarning(
-        'Field empty',
-        current_field.name,
-        current_field_start
-      ))
+      add_warning('Field empty', current_field.name, current_field_start)
     current_field = field
     current_field_start = span[0]
     negated_field = field.allow_negation and bool(is_neg)
@@ -98,6 +94,7 @@ def parse_query(query):
 
   fields = defaultdict(list)
   warnings = []
+  add_warning = lambda *a, **kw: warnings.append(ParseWarning(*a, **kw))
 
   default_field = ALIAS_TO_FIELD.get('s')
 
@@ -120,7 +117,7 @@ def parse_query(query):
       token = token.lower()
       field = ALIAS_TO_FIELD.get(token)
       if not field:
-        warnings.append(ParseWarning('Unknown field', token, m.span()[0]))
+        add_warning('Unknown field', token, m.span()[0])
         continue
       set_current_field(field, m.span(), token_is_neg)
       continue
@@ -144,14 +141,14 @@ def parse_query(query):
   for s in fields[FieldKey('type')]:
     matches = prefix_matches(s, MediaTypeList)
     if not matches:
-      warnings.append(ParseWarning(f'Type "{s}" is unknown'))
+      add_warning(f'Type "{s}" is unknown')
       continue
     if len(matches) > 1:
-      warnings.append(ParseWarning(f'Type "{s}" is ambiguous ({",".join(matches)})'))
+      add_warning(f'Type "{s}" is ambiguous ({",".join(matches)})')
       continue
     types.append(matches[0])
   if len(types) > 1:
-    warnings.append(ParseWarning('Type specified more than once, using first'))
+    add_warning('Type specified more than once, using first')
   if not types:
     types.append('sticker')
   fields[FieldKey('type')] = [types[0]]
@@ -160,14 +157,14 @@ def parse_query(query):
   key = FieldKey('animated')
   if key in fields:
     if len(fields[key]) > 1:
-      warnings.append(ParseWarning('Animated specified more than once, using first'))
+      add_warning('Animated specified more than once, using first')
     animated = fields[key][0]
     if animated in {'yes', 'y', 'true'}:
       fields[key] = ['yes']
     elif animated in {'no', 'n', 'false'}:
       fields[key] = ['no']
     else:
-      warnings.append(ParseWarning(f'Invalid value "{animated}" for "animated"'))
+      add_warning(f'Invalid value "{animated}" for "animated"')
       animated = None
       del fields[key]
 
