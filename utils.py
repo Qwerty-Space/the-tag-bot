@@ -21,6 +21,8 @@ class MediaTypes(str, Enum):
   sticker = 'sticker'
   file = 'file'
 
+MediaTypeList = [e.value for e in MediaTypes]
+
 
 def get_media_type(media):
   if isinstance(media, tl.types.Photo):
@@ -51,6 +53,9 @@ def html_format_tags(tags):
     tags = tags.split(' ')
   return ' '.join(f'<code>{tag}</code>' for tag in tags)
 
+
+def prefix_matches(needle: str, haystack: list[str]):
+  return [item for item in haystack if item.startswith(needle)]
 
 @dataclass
 class ParsedTags:

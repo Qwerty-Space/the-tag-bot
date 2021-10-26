@@ -1,10 +1,10 @@
 import regex
 from dataclasses import dataclass
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 from emoji import UNICODE_EMOJI_ENGLISH
 
-from utils import MediaTypes
+from utils import MediaTypeList, prefix_matches
 
 EMOJI_MODIFIERS = set([
   # Skin tones
@@ -60,7 +60,10 @@ class Field:
   allow_negation: bool = True
 
 
-FieldKey = namedtuple('FieldKey', ['name', 'is_neg'])
+@dataclass(frozen=True)
+class FieldKey:
+  name: str
+  is_neg: bool = False
 
 
 FIELDS = [
@@ -84,7 +87,7 @@ def parse_query(query):
     nonlocal current_field, current_field_start, negated_field, field_was_used
     if not field_was_used:
       warnings.append(ParseWarning(
-        'Field unused',
+        'Field empty',
         current_field.name,
         current_field_start
       ))
@@ -135,6 +138,23 @@ def parse_query(query):
     field_was_used = True
     if current_field.is_short:
       current_field = default_field
+
+  # Use first valid type, otherwise default to sticker
+  types = []
+  for s in fields[FieldKey('type')]:
+    matches = prefix_matches(s, MediaTypeList)
+    if not matches:
+      warnings.append(ParseWarning(f'Type "{s}" is unknown'))
+      continue
+    if len(matches) > 1:
+      warnings.append(ParseWarning(f'Type "{s}" is ambiguous ({",".join(matches)})'))
+      continue
+    types.append(matches[0])
+  if len(types) > 1:
+    warnings.append(ParseWarning('Type specified more than once, using first'))
+  if not types:
+    types.append('sticker')
+  fields[FieldKey('type')] = [types[0]]
 
   return fields, warnings
 
