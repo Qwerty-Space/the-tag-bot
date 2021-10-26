@@ -1,0 +1,27 @@
+WORD: /[^-\!\s:][^\s:]*/
+_NEGATION: /[-\!]/
+_NEWLINE: /\n/
+
+?plain_word: _NEGATION WORD -> word_neg
+           | WORD -> word
+
+?field_spec: "s" -> search
+     | "fn" -> file_name
+     | ("ext" | "e") -> ext
+     | ("pack" | "p") -> pack_name
+?field_spec_short: ("type" | "t") -> type
+           | "animated" -> animated
+?field_spec_unknown: WORD ":" -> error_unknown_field
+?field_spec_no_value: (field_spec | field_spec_short) ":" -> error_no_value
+?stray_colon: ":" -> error_stray_colon
+
+_field: field_spec ":" WORD+
+     | field_spec_short ":" WORD
+     | field_spec_no_value
+     | field_spec_unknown
+field_neg: _NEGATION _field
+field: _field
+
+query: (field_neg | field | plain_word | stray_colon | _NEWLINE)+
+
+%ignore /[ \t\f]+/
