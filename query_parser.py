@@ -137,7 +137,7 @@ def parse_query(query):
     fields[FieldKey(current_field.name, is_neg)].append(token)
     field_was_used = True
     if current_field.is_short:
-      current_field = default_field
+      set_current_field(default_field, m.span())
 
   # Use first valid type, otherwise default to sticker
   types = []
