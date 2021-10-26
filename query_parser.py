@@ -48,7 +48,7 @@ def strip_emojis(text):
 @dataclass
 class ParseWarning:
   name: str
-  data: str
+  data: str = ''
   pos: int = -1
 
 
@@ -72,7 +72,7 @@ FIELDS = [
   Field('ext', ['ext', 'e']),
   Field('pack_name', ['pack', 'p']),
   Field('type', ['type', 't'], is_short=True, allow_negation=False),
-  Field('animated', ['animated'], is_short=True)
+  Field('animated', ['animated'], is_short=True, allow_negation=False)
 ]
 
 ALIAS_TO_FIELD = {
@@ -133,7 +133,7 @@ def parse_query(query):
     if not token:
       continue
 
-    is_neg = negated_field ^ token_is_neg
+    is_neg = current_field.allow_negation and (negated_field ^ token_is_neg)
     fields[FieldKey(current_field.name, is_neg)].append(token)
     field_was_used = True
     if current_field.is_short:
