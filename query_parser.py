@@ -156,6 +156,22 @@ def parse_query(query):
     types.append('sticker')
   fields[FieldKey('type')] = [types[0]]
 
+  # Turn animated into "yes" or "no"
+  key = FieldKey('animated')
+  if key in fields:
+    if len(fields[key]) > 1:
+      warnings.append(ParseWarning('Animated specified more than once, using first'))
+    animated = fields[key][0]
+    if animated in {'yes', 'y', 'true'}:
+      fields[key] = ['yes']
+    elif animated in {'no', 'n', 'false'}:
+      fields[key] = ['no']
+    else:
+      warnings.append(ParseWarning(f'Invalid value "{animated}" for "animated"'))
+      animated = None
+      del fields[key]
+
+
   return fields, warnings
 
 
