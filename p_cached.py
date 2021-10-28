@@ -4,7 +4,7 @@ from collections import defaultdict
 from telethon import errors
 from telethon.tl.types.messages import StickerSet
 from telethon.tl.functions.messages import GetStickerSetRequest
-from cachetools import LRUCache
+from cachetools import LRUCache, TTLCache
 
 from proxy_globals import client
 from utils import acached
@@ -27,7 +27,7 @@ class CachedStickerSet:
     self.short_name = sticker_set.set.short_name
 
 
-@acached(LRUCache(1024), key=lambda ss: getattr(ss, 'id', 0))
+@acached(TTLCache(1024, ttl=60 * 20), key=lambda ss: getattr(ss, 'id', 0))
 async def get_sticker_pack(sticker_set):
   if not sticker_set:
     return
