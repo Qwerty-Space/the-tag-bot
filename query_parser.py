@@ -1,48 +1,9 @@
-import regex
+import re
 from dataclasses import dataclass
 from collections import defaultdict
 
-from emoji import UNICODE_EMOJI_ENGLISH
-
 from utils import MediaTypeList, prefix_matches
-
-EMOJI_MODIFIERS = set([
-  # Skin tones
-  '\U0001f3fb', '\U0001f3fc', '\U0001f3fd', '\U0001f3fe', '\U0001f3ff',
-  # Joiner
-  '\u200d'
-])
-
-# Emoji without any skintones or joins
-PLAIN_EMOJI = set(
-  c.strip('\ufe0f') for c in UNICODE_EMOJI_ENGLISH
-  if not (set(c) & EMOJI_MODIFIERS)
-)
-
-
-def strip_emojis(text):
-  """
-  Strips all emojis from text, returns cleaned text and each "simple" emoji
-  (splits joined emoji, strips skintones, etc)
-  P.S: I hate Unicode
-  """
-  emojis = {}
-  def emoji_repl(m):
-    grapheme = m.group(0)
-
-    if grapheme in PLAIN_EMOJI:
-      emojis[grapheme] = None
-      return ''
-
-    has_emoji = False
-    for c in grapheme:
-      if c in PLAIN_EMOJI:
-        emojis[c] = None
-        has_emoji = True
-    return '' if has_emoji else grapheme
-
-  clean_text = regex.sub(r'\X', emoji_repl, text)
-  return clean_text, list(emojis.keys())
+from emoji_extractor import strip_emojis
 
 
 @dataclass
@@ -102,7 +63,7 @@ def parse_query(query):
   current_field_start = 0
   negated_field = False
   field_was_used = True
-  for m in regex.finditer(r'(?P<is_neg>[\!-]*)(?P<token>[^\s:]+)(?P<is_field>:?)|(\n)', query):
+  for m in re.finditer(r'(?P<is_neg>[\!-]*)(?P<token>[^\s:]+)(?P<is_field>:?)|(\n)', query):
     token = m.group('token')
     token_is_neg = bool(m.group('is_neg'))
 

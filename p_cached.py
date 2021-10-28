@@ -6,8 +6,9 @@ from telethon.tl.types.messages import StickerSet
 from telethon.tl.functions.messages import GetStickerSetRequest
 from cachetools import LRUCache, TTLCache
 
-from proxy_globals import client
+from proxy_globals import client, logger
 from utils import acached
+from emoji_extractor import strip_emojis
 
 
 # StickerSet without unused data
@@ -22,6 +23,15 @@ class CachedStickerSet:
     for pack in sticker_set.packs:
       for doc_id in pack.documents:
         self.sticker_emojis[doc_id].append(pack.emoticon)
+
+    for doc_id, emojis in self.sticker_emojis.items():
+      plain_emojis = []
+      for emoji in emojis:
+        _, extracted = strip_emojis(emoji)
+        if not extracted:
+          logger.warning(f'No emoji extracted from "{emoji.encode("unicode-escape")}"')
+        plain_emojis.extend(extracted)
+      self.sticker_emojis[doc_id] = plain_emojis
 
     self.title = sticker_set.set.title
     self.short_name = sticker_set.set.short_name

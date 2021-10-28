@@ -1,14 +1,10 @@
 import logging
 import importlib
-import os
-from itertools import chain
 import mimetypes
 
-from cachetools import LRUCache
-from telethon import TelegramClient, events, tl, errors
-from telethon.tl.functions.messages import GetStickerSetRequest
+from telethon import TelegramClient
 
-import db, utils, proxy_globals
+import db, proxy_globals
 
 logging.basicConfig(level=logging.INFO)
 client = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e')
@@ -20,10 +16,9 @@ async def main():
   await client.start()
 
   proxy_globals.client = client
-  importlib.import_module('p_tagging')
-  importlib.import_module('p_search')
-  importlib.import_module('p_cached')
-  importlib.import_module('p_emoji_tag_suggester')
+  for module_name in ['p_tagging', 'p_search', 'p_cached', 'p_emoji_tag_suggester']:
+    proxy_globals.logger = logging.getLogger(module_name)
+    importlib.import_module(module_name)
 
   await client.run_until_disconnected()
 
