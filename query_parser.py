@@ -14,26 +14,43 @@ class ParseWarning:
 
 
 @dataclass
-class Field:
+class ParseField:
   name: str
   aliases: list[str]
   allowed_values: list[str] = None
   default: str = None
 
 
-@dataclass(frozen=True)
-class FieldKey:
-  name: str
-  is_neg: bool = False
+class ParsedQuery:
+  def __init__(self):
+    self.fields = defaultdict(list)
+
+  def append(self, name, value, is_neg=False):
+    self.fields[name, is_neg].append(value)
+
+  def has(self, name, is_neg=False):
+    return (name, is_neg) in self.fields
+
+  def get(self, name, is_neg=False):
+    return self.fields[name, is_neg]
+
+  def get_first(self, name, is_neg=False):
+    return self.fields[name, is_neg][0]
+
+  def replace(self, name, value, is_neg=False):
+    self.fields[name, is_neg] = value
+
+  def remove(self, name, is_neg=False):
+    del self.fields[name, is_neg]
 
 
 FIELDS = [
-  Field('tags', ['s']),
-  Field('file_name', ['fn']),
-  Field('ext', ['ext', 'e']),
-  Field('pack_name', ['pack', 'p']),
-  Field('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
-  Field('animated', ['animated'], allowed_values=['yes', 'no'])
+  ParseField('tags', ['s']),
+  ParseField('file_name', ['fn']),
+  ParseField('ext', ['ext', 'e']),
+  ParseField('pack_name', ['pack', 'p']),
+  ParseField('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
+  ParseField('animated', ['animated'], allowed_values=['yes', 'no'])
 ]
 
 ALIAS_TO_FIELD = {
@@ -53,7 +70,8 @@ def parse_query(query):
     negated_field = not field.allowed_values and is_neg
     field_was_used = False
 
-  fields = defaultdict(list)
+  query = query.lower()
+  parsed = ParsedQuery()
   warnings = []
   add_warning = lambda *a, **kw: warnings.append(ParseWarning(*a, **kw))
 
@@ -84,16 +102,15 @@ def parse_query(query):
       continue
 
     token, emojis = strip_emojis(token)
-    key = FieldKey('emoji', token_is_neg)
     for emoji in emojis:
-      fields[key].append(emoji)
+      parsed.append('emoji', emoji, is_neg=token_is_neg)
 
     if not token:
       continue
 
     # only allow negation if the field can have any value
     is_neg = not current_field.allowed_values and (negated_field ^ token_is_neg)
-    fields[FieldKey(current_field.name, is_neg)].append(token)
+    parsed.append(current_field.name, token, is_neg=is_neg)
     field_was_used = True
     if current_field.allowed_values:
       set_current_field(default_field, m.span())
@@ -103,15 +120,17 @@ def parse_query(query):
   for field in FIELDS:
     if not field.allowed_values:
       continue
-    key = FieldKey(field.name)
-    if key not in fields:
+    if not parsed.has(field.name):
+      if field.default:
+        parsed.replace(field.name, [field.default])
       continue
+    values = parsed.get(field.name)
 
-    if len(fields[key]) > 1:
+    if len(values) > 1:
       add_warning(f'{field.name} specified more than once, using first valid')
 
     value = None
-    for s in fields[key]:
+    for s in values:
       matches = prefix_matches(s, field.allowed_values)
       if not matches:
         add_warning(f'Value "{s}" for {field.name} is invalid')
@@ -124,17 +143,8 @@ def parse_query(query):
       value = matches[0]
 
     if value or field.default:
-      fields[key] = [value or field.default]
+      parsed.replace(field.name, [value or field.default])
     else:
-      del fields[key]
+      parsed.remove(field.name)
 
-  return fields, warnings
-
-
-fields, warnings = parse_query('t:sticker 💀✌🏿🇺🇸mugi !2️⃣ p:p:bob k-on\n!yui !animated:yes bla:bla !fn:sticker.webp :weed:')
-
-for field, data in fields.items():
-  print(field, data)
-
-for warning in warnings:
-  print(warning)
+  return parsed, warnings
