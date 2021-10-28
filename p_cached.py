@@ -22,6 +22,9 @@ class CachedStickerSet:
     self.sticker_emojis = defaultdict(list)
     for pack in sticker_set.packs:
       for doc_id in pack.documents:
+        if not pack.emoticon:
+          # idk how this happens, thanks durov
+          continue
         self.sticker_emojis[doc_id].append(pack.emoticon)
 
     for doc_id, emojis in self.sticker_emojis.items():
