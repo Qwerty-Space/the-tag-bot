@@ -56,8 +56,8 @@ class ParseWarning:
 class Field:
   name: str
   aliases: list[str]
-  is_short: bool = False
-  allow_negation: bool = True
+  allowed_values: list[str] = None
+  default: str = None
 
 
 @dataclass(frozen=True)
@@ -71,8 +71,8 @@ FIELDS = [
   Field('file_name', ['fn']),
   Field('ext', ['ext', 'e']),
   Field('pack_name', ['pack', 'p']),
-  Field('type', ['type', 't'], is_short=True, allow_negation=False),
-  Field('animated', ['animated'], is_short=True, allow_negation=False)
+  Field('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
+  Field('animated', ['animated'], allowed_values=['yes', 'no'])
 ]
 
 ALIAS_TO_FIELD = {
@@ -89,7 +89,7 @@ def parse_query(query):
       add_warning('Field empty', current_field.name, current_field_start)
     current_field = field
     current_field_start = span[0]
-    negated_field = field.allow_negation and bool(is_neg)
+    negated_field = not field.allowed_values and is_neg
     field_was_used = False
 
   fields = defaultdict(list)
@@ -130,44 +130,42 @@ def parse_query(query):
     if not token:
       continue
 
-    is_neg = current_field.allow_negation and (negated_field ^ token_is_neg)
+    # only allow negation if the field can have any value
+    is_neg = not current_field.allowed_values and (negated_field ^ token_is_neg)
     fields[FieldKey(current_field.name, is_neg)].append(token)
     field_was_used = True
-    if current_field.is_short:
+    if current_field.allowed_values:
       set_current_field(default_field, m.span())
 
-  # Use first valid type, otherwise default to sticker
-  types = []
-  for s in fields[FieldKey('type')]:
-    matches = prefix_matches(s, MediaTypeList)
-    if not matches:
-      add_warning(f'Type "{s}" is unknown')
+  # Use first valid (prefix match) value for fields with .allowed_values
+  # if no valid value, use .default if present otherwise delete the field
+  for field in FIELDS:
+    if not field.allowed_values:
       continue
-    if len(matches) > 1:
-      add_warning(f'Type "{s}" is ambiguous ({",".join(matches)})')
+    key = FieldKey(field.name)
+    if key not in fields:
       continue
-    types.append(matches[0])
-  if len(types) > 1:
-    add_warning('Type specified more than once, using first')
-  if not types:
-    types.append('sticker')
-  fields[FieldKey('type')] = [types[0]]
 
-  # Turn animated into "yes" or "no"
-  key = FieldKey('animated')
-  if key in fields:
     if len(fields[key]) > 1:
-      add_warning('Animated specified more than once, using first')
-    animated = fields[key][0]
-    if animated in {'yes', 'y', 'true'}:
-      fields[key] = ['yes']
-    elif animated in {'no', 'n', 'false'}:
-      fields[key] = ['no']
-    else:
-      add_warning(f'Invalid value "{animated}" for "animated"')
-      animated = None
-      del fields[key]
+      add_warning(f'{field.name} specified more than once, using first valid')
 
+    value = None
+    for s in fields[key]:
+      matches = prefix_matches(s, field.allowed_values)
+      if not matches:
+        add_warning(f'Value "{s}" for {field.name} is invalid')
+        continue
+      if len(matches) > 1:
+        add_warning(f'Value "{s}" for {field.name} is ambiguous ({",".join(matches)})')
+        continue
+      if value:
+        continue
+      value = matches[0]
+
+    if value or field.default:
+      fields[key] = [value or field.default]
+    else:
+      del fields[key]
 
   return fields, warnings
 
