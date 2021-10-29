@@ -14,6 +14,7 @@ INDEX_NAME = 'tagbot'
 async def search_user_media(
   owner: int, query: ParsedQuery
 ):
+  # TODO: maybe use wildcard or term suggester
   ngram_fields = lambda fs: [
     fmt.format(f) for fmt in ['{}', '{}._2gram', '{}._3gram'] for f in fs
   ]
