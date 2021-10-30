@@ -70,7 +70,6 @@ def parse_query(query):
     negated_field = not field.allowed_values and is_neg
     field_was_used = False
 
-  query = query.lower()
   parsed = ParsedQuery()
   warnings = []
   add_warning = lambda *a, **kw: warnings.append(ParseWarning(*a, **kw))

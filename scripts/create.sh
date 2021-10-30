@@ -1,2 +1,9 @@
-curl -X PUT "localhost:9200/tagbot"
-curl -X PUT "localhost:9200/tagbot/_mapping?pretty" -H 'Content-Type: application/json' --data "@./mapping.json"
+read -p "This will delete the tagbot index and recreate it, are you sure? " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Nn]$ ]]
+then
+  exit 1
+fi
+
+curl -X DELETE "localhost:9200/tagbot?pretty"
+curl -X PUT "localhost:9200/tagbot?pretty" -H 'Content-Type: application/json' --data "@./settings.json"
