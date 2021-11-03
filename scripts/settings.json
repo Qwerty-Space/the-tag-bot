@@ -5,8 +5,31 @@
         "ascii_fold": {
           "type": "custom",
           "tokenizer": "standard",
-          "char_filter": ["split_filter"],
-          "filter": ["lowercase", "asciifolding"]
+          "char_filter": [
+            "split_filter"
+          ],
+          "filter": [
+            "lowercase",
+            "asciifolding"
+          ]
+        },
+        "edge_ngram_3_16": {
+          "tokenizer": "standard",
+          "char_filter": [
+            "split_filter"
+          ],
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "3_16_edgegrams"
+          ]
+        },
+        "trigram": {
+          "tokenizer": "trigram_tokenizer",
+          "filter": [
+            "lowercase",
+            "asciifolding"
+          ]
         }
       },
       "char_filter": {
@@ -16,21 +39,57 @@
             "_ => -"
           ]
         }
+      },
+      "filter": {
+        "3_16_edgegrams": {
+          "type": "edge_ngram",
+          "min_gram": 3,
+          "max_gram": 16
+        }
+      },
+      "tokenizer": {
+        "trigram_tokenizer": {
+          "type": "ngram",
+          "min_gram": 3,
+          "max_gram": 3,
+          "token_chars": [
+            "letter",
+            "digit",
+            "punctuation",
+            "symbol"
+          ]
+        }
       }
     }
   },
   "mappings": {
-    "dynamic": false,
+    "dynamic_templates": [
+      {
+        "fuzzy_fields": {
+          "match_pattern": "regex",
+          "match": "^(title|filename|pack_name|tags)$",
+          "mapping": {
+            "type": "text",
+            "analyzer": "ascii_fold",
+            "fields": {
+              "prefix_ngram": {
+                "type": "text",
+                "analyzer": "edge_ngram_3_16"
+              },
+              "trigram": {
+                "type": "text",
+                "analyzer": "trigram"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "dynamic": true,
     "properties": {
       "access_hash": {
         "type": "keyword",
         "index": false
-      },
-      "title": {
-        "type": "search_as_you_type",
-        "analyzer": "ascii_fold",
-        "doc_values": false,
-        "max_shingle_size": 3
       },
       "created": {
         "type": "long"
@@ -40,16 +99,8 @@
         "ignore_above": 256
       },
       "ext": {
-        "type": "search_as_you_type",
-        "analyzer": "ascii_fold",
-        "doc_values": false,
-        "max_shingle_size": 3
-      },
-      "filename": {
-        "type": "search_as_you_type",
-        "analyzer": "ascii_fold",
-        "doc_values": false,
-        "max_shingle_size": 3
+        "type": "text",
+        "analyzer": "ascii_fold"
       },
       "id": {
         "type": "keyword",
@@ -68,18 +119,6 @@
       "pack_link": {
         "type": "keyword",
         "index": false
-      },
-      "pack_name": {
-        "type": "search_as_you_type",
-        "analyzer": "ascii_fold",
-        "doc_values": false,
-        "max_shingle_size": 3
-      },
-      "tags": {
-        "type": "search_as_you_type",
-        "analyzer": "ascii_fold",
-        "doc_values": false,
-        "max_shingle_size": 3
       },
       "type": {
         "type": "keyword",

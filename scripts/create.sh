@@ -1,6 +1,6 @@
 read -p "This will delete the tagbot index and recreate it, are you sure? " -n 1 -r
 echo
-if [[ $REPLY =~ ^[Nn]$ ]]
+if [[ ! $REPLY =~ ^[Yy]$ ]]
 then
   exit 1
 fi

@@ -14,20 +14,26 @@ INDEX_NAME = 'tagbot'
 async def search_user_media(
   owner: int, query: ParsedQuery
 ):
-  # TODO: maybe use wildcard or term suggester
-  ngram_fields = lambda fs: [
-    fmt.format(f) for fmt in ['{}', '{}._2gram', '{}._3gram'] for f in fs
-  ]
-  ngram_query = lambda fs, vals: MultiMatch(
-    query=' '.join(vals),
-    type='bool_prefix',
-    fields=ngram_fields(fs)
+  fuzzy_match = lambda fields, values: MultiMatch(
+    query=' '.join(values),
+    type='most_fields',
+    fields=fields,
+    operator='and',
+    fuzziness='AUTO:4,6',  # disable fuzzy for trigrams
+    prefix_length=1
+  )
+  fuzzy_ngram = lambda fields, values: fuzzy_match(
+    [
+      f for field in fields for f in
+      [f'{field}', f'{field}.prefix_ngram^2', f'{field}.trigram']
+    ],
+    values
   )
   field_queries = {
-    'tags': lambda f, v: ngram_query([f, 'title'], v),
-    'file_name': lambda f, v: ngram_query([f, 'title'], v),
-    'ext': lambda f, v: ngram_query([f], v),
-    'pack_name': lambda f, v: ngram_query([f], v),
+    'tags': lambda f, v: fuzzy_ngram([f, 'title'], v),
+    'file_name': lambda f, v: fuzzy_ngram([f, 'title'], v),
+    'pack_name': lambda f, v: fuzzy_ngram([f], v),
+    'ext': lambda f, v: fuzzy_match([f], v),
     'animated': lambda f, v: Bool(filter=[Term(is_animated=v[0] == 'yes')]),
     'emoji': lambda f, v: Terms(emoji=v)
   }
