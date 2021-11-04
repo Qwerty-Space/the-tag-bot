@@ -25,16 +25,10 @@ class CachedStickerSet:
         if not pack.emoticon:
           # idk how this happens, thanks durov
           continue
-        self.sticker_emojis[doc_id].append(pack.emoticon)
-
-    for doc_id, emojis in self.sticker_emojis.items():
-      plain_emojis = []
-      for emoji in emojis:
-        _, extracted = strip_emojis(emoji)
+        _, extracted = strip_emojis(pack.emoticon)
         if not extracted:
-          logger.warning(f'No emoji extracted from "{emoji.encode("unicode-escape")}"')
-        plain_emojis.extend(extracted)
-      self.sticker_emojis[doc_id] = plain_emojis
+          logger.warning(f'No emoji extracted from "{pack.emoticon.encode("unicode-escape")}"')
+        self.sticker_emojis[doc_id].extend(extracted)
 
     self.title = sticker_set.set.title
     self.short_name = sticker_set.set.short_name
