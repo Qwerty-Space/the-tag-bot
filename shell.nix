@@ -4,8 +4,8 @@ pkgs.mkShell {
   buildInputs = [
     (pkgs.python39.withPackages (ps: with ps; [
       (callPackage ./nix/telethon.nix {})
-      (callPackage ./nix/buildpg.nix {})
-      asyncpg cachetools
+      elasticsearch aiohttp elasticsearch-dsl
+      cachetools boltons regex emoji
     ]))
   ];
 }

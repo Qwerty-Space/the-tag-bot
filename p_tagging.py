@@ -2,13 +2,15 @@ import os
 import mimetypes
 from collections import defaultdict
 import functools
+import time
 
-import asyncpg
 from telethon import events, tl
 
 from proxy_globals import client
-from constants import MAX_TAGS_PER_FILE
+import constants
 import p_cached
+from data_model import MediaTypes, TaggedDocument
+from query_parser import parse_tags, ALIAS_TO_FIELD
 import db, utils
 
 
@@ -16,46 +18,54 @@ def extract_taggable_media(handler):
   @functools.wraps(handler)
   async def wrapper(event, *args, **kwargs):
     reply = await event.get_reply_message()
-    m_type = utils.get_media_type(reply.file.media) if reply else None
-    return await handler(event, reply=reply, m_type=m_type, *args, **kwargs)
+    m_type = MediaTypes.from_media(reply.file.media) if reply else None
+    ret = await handler(event, reply=reply, m_type=m_type, *args, **kwargs)
+    if isinstance(ret, str):
+      await event.respond(ret)
+    return ret
   return wrapper
 
 
-def format_tags(media_name, m_type, metatags, tags):
+def format_tagged_doc(doc: TaggedDocument):
+  info = []
+  for alias in ('t', 'e', 'fn', 'p', 'a'):
+    key = ALIAS_TO_FIELD[alias].name
+    value = getattr(doc, key)
+    if value:
+      info.append(f'{alias}:{value}')
   return (
-    f'Tags for {media_name}:'
-    f'\nmeta: [t:{m_type.value}] {utils.html_format_tags(metatags)}'
-    f'\n{utils.html_format_tags(tags)}'
+    f'Info for {doc.id}:'
+    f'\ninfo: {" ".join(info)}'
+    f'\ntags: {utils.html_format_tags(doc.tags)}'
+    + (f'\nemoji: {" ".join(doc.emoji)}' if doc.emoji else '')
   )
 
 
-async def get_media_generated_tags(file):
-  tags = []
+async def get_media_generated_attrs(file):
+  ext = mimetypes.guess_extension(file.mime_type)
+  if file.name:
+    ext = os.path.splitext(file.name)[1] or ext
 
-  if file.mime_type == 'application/x-tgsticker':
-    tags.append('a:animated')
+  attrs = {
+    'ext': ext.strip('.'),
+    'is_animated': (file.mime_type == 'application/x-tgsticker'),
+  }
 
   pack = await p_cached.get_sticker_pack(file.sticker_set)
   if pack:
-    tags.append(utils.sanitise_tag(f'g:{pack.title}'))
-  elif isinstance(file.sticker_set, tl.types.InputStickerSetEmpty):
-    tags.append('g:none')
-
-  ext = mimetypes.guess_extension(file.mime_type)
-
-  # TODO: maybe extract file name to tags
-  file_title = file.name or ''
-  if file.performer and file.title:
-    file_title = f'{file.performer} - {file.title}'
-    tags.append(utils.sanitise_tag(f'a:{file.performer}'))
-    tags.append(utils.sanitise_tag(f'n:{file.title}'))
+    attrs['pack_name'] = pack.title
+    attrs['pack_link'] = pack.short_name
+    attrs['emoji'] = pack.sticker_emojis[file.media.id]
 
   if file.name:
-    file_ext = os.path.splitext(file.name)[1]
-    if file_ext:
-      ext = file_ext
-  tags.append(f"e:{ext.lstrip('.')}")
-  return file_title, ' '.join(tags)
+    attrs['filename'] = file.name
+
+  if file.title:
+    attrs['title'] = file.title
+  if file.performer and file.title:
+    attrs['title'] = f'{file.performer} - {file.title}'
+
+  return attrs
 
 
 @client.on(events.NewMessage())
@@ -63,104 +73,85 @@ async def get_media_generated_tags(file):
 @extract_taggable_media
 async def on_tag(event, reply, m_type):
   m = event.message
-  if m.raw_text.startswith('/'):
+  if m.raw_text[:1] in {'/', '.'}:
     return
   if not reply or not reply.media:
     return
   if not m_type:
-    await event.respond("I don't know how to handle that media type yet!")
-    return
+    return 'I don\'t know how to handle that media type yet!'
   file_id, access_hash = reply.file.media.id, reply.file.media.access_hash
+  owner = event.sender_id
 
-  tags = utils.parse_tags(m.raw_text)
-  if tags.is_empty():
-    return
-  old_tags = await db.get_media_user_tags(file_id, m.sender_id)
-  old_tags = set(old_tags.split(' ')) if old_tags else set()
-
-  new_tags = (old_tags | tags.pos) - tags.neg
-  title, metatags = await get_media_generated_tags(reply.file)
-  try:
-    if len(new_tags) > MAX_TAGS_PER_FILE:
-      raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags allowed per file!')
-    new_tags = ' '.join(new_tags)
-    await db.set_media_tags(
-      id=file_id,
-      owner=m.sender_id,
-      access_hash=access_hash,
-      m_type=m_type,
-      title=title,
-      metatags=metatags,
-      tags=new_tags
-    )
-    await event.reply(
-      format_tags(file_id, m_type, metatags, new_tags),
-      parse_mode='HTML'
-    )
-  except (asyncpg.exceptions.RaiseError, ValueError) as e:
-    await event.reply(f'Error: {e}', parse_mode=None)
-
-
-@client.on(events.NewMessage(pattern=r'/type_tags ?(.*)'))
-@utils.whitelist
-@extract_taggable_media
-async def my_tags(event: events.NewMessage.Event, reply, m_type):
-  type_str = event.pattern_match.group(1) or utils.MediaTypes.sticker.value
-  if not m_type:
-    m_type = await db.get_corrected_media_type(type_str)
-
-  if not m_type:
-    await event.reply('I don\'t understand what type of media that is!')
+  q = parse_tags(m.raw_text)
+  if not q.fields:
     return
 
-  rows = await db.get_user_tags_for_type(event.sender_id, m_type)
-  if not rows:
-    await event.reply(
-      f'You have not tagged any media of type "t:{m_type.value}"".'
+  for tag in q.get('tags'):
+    if len(tag) > constants.MAX_TAG_LENGTH:
+      return f'Tags are limited to a length of {constants.MAX_TAG_LENGTH}!'
+
+  doc = (
+    await db.get_user_media(owner, file_id)
+    or TaggedDocument(
+      owner=owner, id=file_id, access_hash=access_hash, type=m_type
     )
-    return
-
-  group_by_count = defaultdict(list)
-  for r in rows:
-    group_by_count[r['count']].append(r['name'])
-
-  out_text = '\n'.join(
-    f"({count}) {' '.join(names)}" for count, names in group_by_count.items()
-  )
-  await event.reply(
-    f'Your tags for "t:{m_type.value}":\n{out_text}',
-    parse_mode=None
   )
 
+  gen_attrs = await get_media_generated_attrs(reply.file)
+  # don't replace user emoji with ones from pack
+  if doc.emoji:
+    gen_attrs.pop('emoji', None)
+  # don't include filename for stickers
+  if m_type == MediaTypes.sticker:
+    gen_attrs.pop('filename', None)
+  doc = doc.merge(**gen_attrs)
+  doc.last_used = round(time.time())
 
-@client.on(events.NewMessage(pattern=r'/show_tags$'))
-@utils.whitelist
-@extract_taggable_media
-async def show_tags(event: events.NewMessage.Event, reply, m_type):
-  if not m_type:
-    await event.reply('Reply to media to use this command.')
-    return
+  # calculate new tags and emoji
+  doc.tags = (doc.tags | q.get('tags')) - q.get('tags', is_neg=True)
+  if len(doc.tags) > constants.MAX_TAGS_PER_FILE:
+    return f'Only {constants.MAX_TAGS_PER_FILE} tags are allowed per file!'
 
-  file_id = reply.file.media.id
-  row = await db.get_media_tags(file_id, event.sender_id)
-  if not row:
-    await event.reply('No tags found.')
-    return
+  doc.emoji = (doc.emoji | q.get('emoji')) - q.get('emoji', is_neg=True)
+  if len(doc.emoji) > constants.MAX_EMOJI_PER_FILE:
+    return f'Only {constants.MAX_EMOJI_PER_FILE} emoji are allowed per file!'
+
+  await db.update_user_media(owner, file_id, doc.to_dict())
 
   await event.reply(
-    format_tags(file_id, m_type, row['metatags'], row['tags']),
+    format_tagged_doc(doc),
     parse_mode='HTML'
   )
 
 
-@client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
-@utils.whitelist
-@extract_taggable_media
-async def show_tags(event: events.NewMessage.Event, reply, m_type):
-  if not m_type:
-    await event.reply('Reply to media to use this command.')
-    return
+# @client.on(events.NewMessage(pattern=r'/show_tags$'))
+# @utils.whitelist
+# @extract_taggable_media
+# async def show_tags(event: events.NewMessage.Event, reply, m_type):
+#   if not m_type:
+#     await event.reply('Reply to media to use this command.')
+#     return
 
-  file_id = reply.file.media.id
-  deleted_id = await db.delete_media(file_id, event.sender_id)
-  await event.reply('Media deleted.' if deleted_id else 'Media not found.')
+#   file_id = reply.file.media.id
+#   row = await db.get_media_tags(file_id, event.sender_id)
+#   if not row:
+#     await event.reply('No tags found.')
+#     return
+
+#   await event.reply(
+#     format_tags(file_id, m_type, row['metatags'], row['tags']),
+#     parse_mode='HTML'
+#   )
+
+
+# @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
+# @utils.whitelist
+# @extract_taggable_media
+# async def show_tags(event: events.NewMessage.Event, reply, m_type):
+#   if not m_type:
+#     await event.reply('Reply to media to use this command.')
+#     return
+
+#   file_id = reply.file.media.id
+#   deleted_id = await db.delete_media(file_id, event.sender_id)
+#   await event.reply('Media deleted.' if deleted_id else 'Media not found.')

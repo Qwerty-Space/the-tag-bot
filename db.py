@@ -1,14 +1,21 @@
-import asyncio
+import base64
+import struct
+import time
 
-from elasticsearch import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 
 from query_parser import ParsedQuery
+from data_model import TaggedDocument
 
 
 es = AsyncElasticsearch()
 INDEX_NAME = 'tagbot'
+
+
+def pack_doc_id(owner: int, id: int):
+  return base64.urlsafe_b64encode(struct.pack('!QQ', owner, id))
 
 
 async def search_user_media(
@@ -31,10 +38,10 @@ async def search_user_media(
   )
   field_queries = {
     'tags': lambda f, v: fuzzy_ngram([f, 'title'], v),
-    'file_name': lambda f, v: fuzzy_ngram([f, 'title'], v),
+    'filename': lambda f, v: fuzzy_ngram([f, 'title'], v),
     'pack_name': lambda f, v: fuzzy_ngram([f], v),
     'ext': lambda f, v: fuzzy_match([f], v),
-    'animated': lambda f, v: Bool(filter=[Term(is_animated=v[0] == 'yes')]),
+    'is_animated': lambda f, v: Bool(filter=[Term(is_animated=v[0] == 'yes')]),
     'emoji': lambda f, v: Terms(emoji=v)
   }
 
@@ -43,7 +50,7 @@ async def search_user_media(
     .filter('term', owner=owner)
     .filter('term', type=query.get_first('type'))
     .sort('_score', '-last_used')
-    .source(includes=['id', 'access_hash', 'tags', 'file_name', 'title'])
+    .source(includes=['id', 'access_hash', 'tags', 'filename', 'title'])
   )
 
   for (field, is_neg), values in query.fields.items():
@@ -63,11 +70,27 @@ async def search_user_media(
   return [o['_source'] for o in r['hits']['hits']]
 
 
-import query_parser
+async def get_user_media(owner: int, id: int):
+  try:
+    r = await es.get(index=INDEX_NAME, id=pack_doc_id(owner, id))
+    return TaggedDocument(**r['_source'])
+  except NotFoundError:
+    return None
 
-query, _ = query_parser.parse_query('greg')
 
-print(query.fields)
+async def update_user_media(owner: int, id: int, doc: dict):
+  r = await es.update(
+    index=INDEX_NAME,
+    id=pack_doc_id(owner, id),
+    doc=doc,
+    doc_as_upsert=True
+  )
+  # if r['result'] == 'created' ...
+  return r
 
-v = asyncio.run(search_user_media(232787997, query))
-print(v)
+async def update_last_used(owner: int, id: int):
+  return await es.update(
+    index=INDEX_NAME,
+    id=pack_doc_id(owner, id),
+    doc={'last_used': round(time.time())}
+  )

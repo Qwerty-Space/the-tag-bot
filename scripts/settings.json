@@ -21,7 +21,7 @@
           "filter": [
             "lowercase",
             "asciifolding",
-            "3_16_edgegrams"
+            "3_32_edgegrams"
           ]
         },
         "trigram": {
@@ -41,10 +41,10 @@
         }
       },
       "filter": {
-        "3_16_edgegrams": {
+        "3_32_edgegrams": {
           "type": "edge_ngram",
           "min_gram": 3,
-          "max_gram": 16
+          "max_gram": 32
         }
       },
       "tokenizer": {

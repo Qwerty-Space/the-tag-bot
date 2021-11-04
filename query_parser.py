@@ -2,7 +2,8 @@ import re
 from dataclasses import dataclass
 from collections import defaultdict
 
-from utils import MediaTypeList, prefix_matches
+from utils import prefix_matches
+from data_model import MediaTypeList
 from emoji_extractor import strip_emojis
 
 
@@ -46,11 +47,11 @@ class ParsedQuery:
 
 FIELDS = [
   _ParseField('tags', ['s']),
-  _ParseField('file_name', ['fn']),
+  _ParseField('filename', ['fn']),
   _ParseField('ext', ['ext', 'e']),
   _ParseField('pack_name', ['pack', 'p']),
   _ParseField('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
-  _ParseField('animated', ['animated'], allowed_values=['yes', 'no'])
+  _ParseField('is_animated', ['animated', 'a'], allowed_values=['yes', 'no'])
 ]
 
 ALIAS_TO_FIELD = {
@@ -58,6 +59,27 @@ ALIAS_TO_FIELD = {
   for field in FIELDS
   for alias in field.aliases
 }
+
+
+def parse_tags(query):
+  parsed = ParsedQuery()
+
+  for m in re.finditer(r'(?P<is_neg>[\!-]*)(?P<token>[^\s:]+)', query):
+    token = m.group('token')
+    token_is_neg = bool(m.group('is_neg'))
+
+    if ':' in token:
+      continue
+
+    token, emojis = strip_emojis(token)
+    for emoji in emojis:
+      parsed.append('emoji', emoji, is_neg=token_is_neg)
+    if not token:
+      continue
+
+    parsed.append('tags', token, is_neg=token_is_neg)
+
+  return parsed
 
 
 def parse_query(query):
