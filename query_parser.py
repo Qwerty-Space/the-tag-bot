@@ -14,7 +14,7 @@ class ParseWarning:
 
 
 @dataclass
-class ParseField:
+class _ParseField:
   name: str
   aliases: list[str]
   allowed_values: list[str] = None
@@ -45,12 +45,12 @@ class ParsedQuery:
 
 
 FIELDS = [
-  ParseField('tags', ['s']),
-  ParseField('file_name', ['fn']),
-  ParseField('ext', ['ext', 'e']),
-  ParseField('pack_name', ['pack', 'p']),
-  ParseField('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
-  ParseField('animated', ['animated'], allowed_values=['yes', 'no'])
+  _ParseField('tags', ['s']),
+  _ParseField('file_name', ['fn']),
+  _ParseField('ext', ['ext', 'e']),
+  _ParseField('pack_name', ['pack', 'p']),
+  _ParseField('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
+  _ParseField('animated', ['animated'], allowed_values=['yes', 'no'])
 ]
 
 ALIAS_TO_FIELD = {
