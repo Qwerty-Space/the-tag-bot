@@ -124,24 +124,24 @@ async def on_tag(event, reply, m_type):
   )
 
 
-# @client.on(events.NewMessage(pattern=r'/show_tags$'))
-# @utils.whitelist
-# @extract_taggable_media
-# async def show_tags(event: events.NewMessage.Event, reply, m_type):
-#   if not m_type:
-#     await event.reply('Reply to media to use this command.')
-#     return
+@client.on(events.NewMessage(pattern=r'/tags$'))
+@utils.whitelist
+@extract_taggable_media
+async def show_tags(event: events.NewMessage.Event, reply, m_type):
+  if not m_type:
+    await event.reply('Reply to media to use this command.')
+    return
 
-#   file_id = reply.file.media.id
-#   row = await db.get_media_tags(file_id, event.sender_id)
-#   if not row:
-#     await event.reply('No tags found.')
-#     return
+  file_id = reply.file.media.id
+  doc = await db.get_user_media(event.sender_id, file_id)
+  if not doc:
+    await event.reply('No tags found.')
+    return
 
-#   await event.reply(
-#     format_tags(file_id, m_type, row['metatags'], row['tags']),
-#     parse_mode='HTML'
-#   )
+  await event.reply(
+    format_tagged_doc(doc),
+    parse_mode='HTML'
+  )
 
 
 # @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
