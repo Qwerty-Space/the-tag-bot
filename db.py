@@ -88,9 +88,20 @@ async def update_user_media(owner: int, id: int, doc: dict):
   # if r['result'] == 'created' ...
   return r
 
+
 async def update_last_used(owner: int, id: int):
   return await es.update(
     index=INDEX_NAME,
     id=pack_doc_id(owner, id),
     doc={'last_used': round(time.time())}
   )
+
+
+async def delete_user_media(owner: int, id: int):
+  try:
+    return await es.delete(
+      index=INDEX_NAME,
+      id=pack_doc_id(owner, id)
+    )
+  except NotFoundError:
+    return None
