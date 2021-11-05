@@ -8,13 +8,6 @@ from emoji_extractor import strip_emojis
 
 
 @dataclass
-class ParseWarning:
-  name: str
-  data: str = ''
-  pos: int = -1
-
-
-@dataclass
 class _ParseField:
   name: str
   aliases: list[str]
@@ -84,22 +77,19 @@ def parse_tags(query):
 
 def parse_query(query):
   def set_current_field(field, span, is_neg=False):
-    nonlocal current_field, current_field_start, negated_field, field_was_used
+    nonlocal current_field, negated_field, field_was_used
     if not field_was_used:
-      add_warning('Field empty', current_field.name, current_field_start)
+      warnings.append(f'Field "{current_field.name}" empty')
     current_field = field
-    current_field_start = span[0]
     negated_field = not field.allowed_values and is_neg
     field_was_used = False
 
   parsed = ParsedQuery()
   warnings = []
-  add_warning = lambda *a, **kw: warnings.append(ParseWarning(*a, **kw))
 
   default_field = ALIAS_TO_FIELD.get('s')
 
   current_field = default_field
-  current_field_start = 0
   negated_field = False
   field_was_used = True
   for m in re.finditer(r'(?P<is_neg>[\!-]*)(?P<token>[^\s:]+)(?P<is_field>:?)|(\n)', query):
@@ -117,7 +107,7 @@ def parse_query(query):
       token = token.lower()
       field = ALIAS_TO_FIELD.get(token)
       if not field:
-        add_warning('Unknown field', token, m.span()[0])
+        warnings.append(f'Unknown field "{token}"')
         continue
       set_current_field(field, m.span(), token_is_neg)
       continue
@@ -148,16 +138,16 @@ def parse_query(query):
     values = parsed.get(field.name)
 
     if len(values) > 1:
-      add_warning(f'{field.name} specified more than once, using first valid')
+      warnings.append(f'{field.name} specified more than once, using first valid')
 
     value = None
     for s in values:
       matches = prefix_matches(s, field.allowed_values)
       if not matches:
-        add_warning(f'Value "{s}" for {field.name} is invalid')
+        warnings.append(f'Value "{s}" for {field.name} is invalid')
         continue
       if len(matches) > 1:
-        add_warning(f'Value "{s}" for {field.name} is ambiguous ({",".join(matches)})')
+        warnings.append(f'Value "{s}" for {field.name} is ambiguous ({",".join(matches)})')
         continue
       if value:
         continue

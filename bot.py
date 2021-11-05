@@ -15,7 +15,7 @@ async def main():
   await client.start()
 
   proxy_globals.client = client
-  for module_name in ['p_tagging', 'p_cached']:
+  for module_name in ['p_tagging', 'p_search', 'p_cached']:
     proxy_globals.logger = logging.getLogger(module_name)
     importlib.import_module(module_name)
 
