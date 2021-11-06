@@ -24,7 +24,11 @@ async def on_inline(event: events.InlineQuery.Event):
   # TODO: highlight matches
   # https://www.elastic.co/guide/en/elasticsearch/reference/current/highlighting.html#matched-fields
   def truncate_tags(tags):
-    return ' '.join(tags)[:128].rsplit(' ', 1)[0] + '…'
+    tags = ' '.join(tags)
+    if len(tags) < 128:
+      return tags
+    return tags[:128].rsplit(' ', 1)[0] + '…'
+
   user_id = event.query.user_id
   last_query_cache[user_id] = event.text
   q, warnings = query_parser.parse_query(event.text)
