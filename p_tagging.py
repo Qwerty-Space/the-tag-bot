@@ -114,7 +114,10 @@ async def on_tag(event, reply, m_type):
   if len(doc.emoji) > constants.MAX_EMOJI_PER_FILE:
     return f'Only {constants.MAX_EMOJI_PER_FILE} emoji are allowed per file!'
 
-  await db.update_user_media(owner, file_id, doc.to_dict())
+  try:
+    await db.update_user_media(owner, file_id, doc.to_dict())
+  except ValueError as e:
+    return f'Error: {e}'
 
   await event.reply(
     format_tagged_doc(doc),
