@@ -57,7 +57,8 @@ async def get_media_generated_attrs(file):
     attrs['pack_link'] = pack.short_name
     attrs['emoji'] = pack.sticker_emojis[file.media.id]
 
-  if file.name:
+  # don't include filename for stickers with a pack
+  if file.name and not pack:
     attrs['filename'] = file.name
 
   if file.title:
@@ -101,9 +102,6 @@ async def on_tag(event, reply, m_type):
   # don't replace user emoji with ones from pack
   if doc.emoji:
     gen_attrs.pop('emoji', None)
-  # don't include filename for stickers
-  if m_type == MediaTypes.sticker:
-    gen_attrs.pop('filename', None)
   doc = doc.merge(**gen_attrs)
   doc.last_used = round(time.time())
 
