@@ -80,7 +80,8 @@
                 "type": "text",
                 "analyzer": "trigram"
               }
-            }
+            },
+            "norms": false
           }
         }
       }
