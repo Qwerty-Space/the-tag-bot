@@ -5,6 +5,7 @@ from cachetools import LRUCache
 from telethon import events
 
 from data_model import MediaTypes
+from p_help import add_to_help
 from proxy_globals import client
 import db, utils, query_parser
 from constants import MAX_RESULTS_PER_PAGE
@@ -66,10 +67,18 @@ async def on_inline(event: events.InlineQuery.Event):
   )
 
 
-@client.on(events.NewMessage(pattern=r'/parse (.+)'))
+@client.on(events.NewMessage(pattern=r'/parse( .+)?'))
 @utils.whitelist
-async def parse(event: events.NewMessage.Event, query=None):
+@add_to_help('parse')
+async def parse(event: events.NewMessage.Event, show_help, query=None):
+  """
+  Parses a query (for debugging)
+  Shows the result of parsing a query, normally you shouldn't have to use this.
+  /parse <query here>
+  """
   query = query or event.pattern_match.group(1)
+  if not query:
+    return await show_help()
 
   out_text = ''
   q, warnings = query_parser.parse_query(query)

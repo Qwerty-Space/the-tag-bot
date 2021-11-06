@@ -15,9 +15,16 @@ async def main():
   await client.start()
 
   proxy_globals.client = client
-  for module_name in ['p_tagging', 'p_search', 'p_cached']:
+  load_callbacks = []
+  for module_name in ['p_cached', 'p_help', 'p_tagging', 'p_search']:
     proxy_globals.logger = logging.getLogger(module_name)
-    importlib.import_module(module_name)
+    module = importlib.import_module(module_name)
+    init = getattr(module, 'on_done_loading', None)
+    if init:
+      load_callbacks.append(init)
+
+  for cb in load_callbacks:
+    await cb()
 
   await client.run_until_disconnected()
 

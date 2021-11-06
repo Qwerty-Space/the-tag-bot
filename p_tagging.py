@@ -1,6 +1,5 @@
 import os
 import mimetypes
-from collections import defaultdict
 import functools
 import time
 
@@ -9,6 +8,7 @@ from telethon import events, tl
 from proxy_globals import client
 import constants
 import p_cached
+from p_help import add_to_help
 from data_model import MediaTypes, TaggedDocument
 from query_parser import parse_tags, ALIAS_TO_FIELD
 import db, utils
@@ -128,10 +128,15 @@ async def on_tag(event, reply, m_type):
 @client.on(events.NewMessage(pattern=r'/tags$'))
 @utils.whitelist
 @extract_taggable_media
-async def show_tags(event: events.NewMessage.Event, reply, m_type):
+@add_to_help('tags')
+async def show_tags(event: events.NewMessage.Event, reply, m_type, show_help):
+  """
+  Shows the tags for media that you have saved
+  Reply to media to use this command.
+  """
+
   if not m_type:
-    await event.reply('Reply to media to use this command.')
-    return
+    return await show_help()
 
   file_id = reply.file.media.id
   doc = await db.get_user_media(event.sender_id, file_id)
@@ -148,10 +153,15 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type):
 @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
 @utils.whitelist
 @extract_taggable_media
-async def delete(event: events.NewMessage.Event, reply, m_type):
+@add_to_help('delete', 'remove')
+async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
+  """
+  Deletes media that you have saved.
+  Reply to media to use this command.
+  """
+
   if not m_type:
-    await event.reply('Reply to media to use this command.')
-    return
+    return await show_help()
 
   file_id = reply.file.media.id
   deleted_res = await db.delete_user_media(event.sender_id, file_id)
