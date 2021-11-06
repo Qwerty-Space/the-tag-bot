@@ -82,7 +82,7 @@ class TaggedDocument:
     d = {}
     for field in dataclasses.fields(self):
       val = getattr(self, field.name)
-      if val == TaggedDocumentInvalidValue:
+      if id(val) == id(TaggedDocumentInvalidValue):
         raise ValueError('Can\'t serialize TaggedDocument with invalid value')
       if isinstance(val, IndexedSet):
         val = list(val)
