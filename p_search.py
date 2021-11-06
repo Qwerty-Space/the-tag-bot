@@ -7,6 +7,7 @@ from telethon import events
 from data_model import MediaTypes
 from proxy_globals import client
 import db, utils, query_parser
+from constants import MAX_RESULTS_PER_PAGE
 from telethon.tl.types import InputDocument, InputPhoto, UpdateBotInlineSend
 
 
@@ -32,9 +33,8 @@ async def on_inline(event: events.InlineQuery.Event):
   user_id = event.query.user_id
   last_query_cache[user_id] = event.text
   q, warnings = query_parser.parse_query(event.text)
-  # TODO: fix
-  # offset = int(event.offset or 0)
-  docs = await db.search_user_media(user_id, q)
+  offset = int(event.offset or 0)
+  docs = await db.search_user_media(user_id, q, offset)
 
   res_type = q.get_first('type')
   # 'audio' only works for audio/mpeg, thanks durov
@@ -60,7 +60,7 @@ async def on_inline(event: events.InlineQuery.Event):
     [get_result(d) for d in docs],
     cache_time=0 if warnings else 5,
     private=True,
-    # next_offset=f'{offset + 1}' if len(rows) >= 50 else None,
+    next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
     switch_pm=f'{len(warnings)} warnings' if warnings else None,
     switch_pm_param='parse'
   )

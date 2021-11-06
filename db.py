@@ -8,6 +8,7 @@ from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 
 from query_parser import ParsedQuery
 from data_model import TaggedDocument
+from constants import MAX_RESULTS_PER_PAGE
 
 
 es = AsyncElasticsearch()
@@ -19,7 +20,7 @@ def pack_doc_id(owner: int, id: int):
 
 
 async def search_user_media(
-  owner: int, query: ParsedQuery
+  owner: int, query: ParsedQuery, page: int = 0
 ):
   fuzzy_match = lambda fields, values: MultiMatch(
     query=' '.join(values),
@@ -64,7 +65,8 @@ async def search_user_media(
 
   r = await es.search(
     index=INDEX_NAME,
-    size=50,
+    size=MAX_RESULTS_PER_PAGE,
+    from_=page * MAX_RESULTS_PER_PAGE,
     **q.to_dict()
   )
   return [TaggedDocument(**o['_source']) for o in r['hits']['hits']]
