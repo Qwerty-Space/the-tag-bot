@@ -3,7 +3,7 @@ import functools
 from cachetools import keys
 
 
-WHITELISTED_IDS = {232787997}
+WHITELISTED_IDS = {232787997, 151462131}
 
 
 def html_format_tags(tags):
