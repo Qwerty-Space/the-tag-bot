@@ -43,13 +43,14 @@ class MediaTypes(str, Enum):
 
 MediaTypeList = [e.value for e in MediaTypes]
 
+TaggedDocumentInvalidValue = object()
 
 @dataclass
 class TaggedDocument:
-  owner: int
-  id: int
-  access_hash: int
-  type: MediaTypes
+  owner: int = TaggedDocumentInvalidValue
+  id: int = TaggedDocumentInvalidValue
+  access_hash: int = TaggedDocumentInvalidValue
+  type: MediaTypes = TaggedDocumentInvalidValue
   ext: str = ''
   is_animated: bool = False
   pack_name: str = ''
@@ -81,6 +82,8 @@ class TaggedDocument:
     d = {}
     for field in dataclasses.fields(self):
       val = getattr(self, field.name)
+      if val == TaggedDocumentInvalidValue:
+        raise ValueError('Can\'t serialize TaggedDocument with invalid value')
       if isinstance(val, IndexedSet):
         val = list(val)
       d[field.name] = val

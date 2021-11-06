@@ -67,7 +67,7 @@ async def search_user_media(
     size=50,
     **q.to_dict()
   )
-  return [o['_source'] for o in r['hits']['hits']]
+  return [TaggedDocument(**o['_source']) for o in r['hits']['hits']]
 
 
 async def get_user_media(owner: int, id: int):

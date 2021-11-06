@@ -4,6 +4,7 @@ from cachetools import LRUCache
 
 from telethon import events
 
+from data_model import MediaTypes
 from proxy_globals import client
 import db, utils, query_parser
 from telethon.tl.types import InputDocument, InputPhoto, UpdateBotInlineSend
@@ -17,53 +18,48 @@ async def on_inline_selected(event):
   await db.update_last_used(event.user_id, int(event.id))
 
 
-# @client.on(events.InlineQuery())
-# @utils.whitelist
-# async def on_inline(event: events.InlineQuery.Event):
-#   def get_unmatched_tags(tag_str):
-#     return ' '.join(set(tag_str.split(' ')) - tags.pos - tags.neg) or m_type.value
+@client.on(events.InlineQuery())
+@utils.whitelist
+async def on_inline(event: events.InlineQuery.Event):
+  # TODO: highlight matches
+  # https://www.elastic.co/guide/en/elasticsearch/reference/current/highlighting.html#matched-fields
+  def truncate_tags(tags):
+    return ' '.join(tags)[:128].rsplit(' ', 1)[0] + '…'
+  user_id = event.query.user_id
+  last_query_cache[user_id] = event.text
+  q, warnings = query_parser.parse_query(event.text)
+  # TODO: fix
+  # offset = int(event.offset or 0)
+  docs = await db.search_user_media(user_id, q)
 
-#   user_id = event.query.user_id
-#   last_query_cache[user_id] = event.text
-#   tags = utils.parse_tags(event.text)
-#   m_type, tags, dropped = await db.get_corrected_user_tags(user_id, tags)
-#   if not m_type:
-#     await event.answer(
-#       switch_pm='Failed to parse media type',
-#       switch_pm_param='parse'
-#     )
-#     return
+  res_type = q.get_first('type')
+  # 'audio' only works for audio/mpeg, thanks durov
+  if res_type == MediaTypes.audio.value:
+    res_type = MediaTypes.file.value
 
-#   offset = int(event.offset or 0)
-#   rows = await db.search_user_media(user_id, m_type, tags, offset)
-#   result_type = {
-#     # 'audio' only works for audio/mpeg, thanks durov
-#     utils.MediaTypes.audio: utils.MediaTypes.file
-#   }.get(m_type, m_type).value
-
-#   builder = event.builder
-#   if m_type == utils.MediaTypes.photo:
-#     get_result = lambda r: builder.photo(
-#       id=str(r['id']),
-#       file=InputPhoto(r['id'], r['access_hash'], b'')
-#     )
-#   else:
-#     get_result = (
-#       lambda r: builder.document(
-#         id=str(r['id']),
-#         file=InputDocument(r['id'], r['access_hash'], b''),
-#         type=result_type,
-#         title=r['title'] or get_unmatched_tags(r['all_tags']) or result_type
-#       )
-#     )
-#   await event.answer(
-#     [get_result(r) for r in rows],
-#     cache_time=0 if dropped else 5,
-#     private=True,
-#     next_offset=f'{offset + 1}' if len(rows) >= 50 else None,
-#     switch_pm=f'{len(dropped)} tags dropped' if dropped else None,
-#     switch_pm_param='parse'
-#   )
+  builder = event.builder
+  if res_type == MediaTypes.photo.value:
+    get_result = lambda d: builder.photo(
+      id=str(d.id),
+      file=InputPhoto(d.id, d.access_hash, b'')
+    )
+  else:
+    get_result = (
+      lambda d: builder.document(
+        id=str(d.id),
+        file=InputDocument(d.id, d.access_hash, b''),
+        type=res_type,
+        title=d.title or truncate_tags(d.tags) or f'[{res_type}]'
+      )
+    )
+  await event.answer(
+    [get_result(d) for d in docs],
+    cache_time=0 if warnings else 5,
+    private=True,
+    # next_offset=f'{offset + 1}' if len(rows) >= 50 else None,
+    switch_pm=f'{len(warnings)} warnings' if warnings else None,
+    switch_pm_param='parse'
+  )
 
 
 @client.on(events.NewMessage(pattern=r'/parse (.+)'))
