@@ -148,7 +148,7 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type):
 @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
 @utils.whitelist
 @extract_taggable_media
-async def show_tags(event: events.NewMessage.Event, reply, m_type):
+async def delete(event: events.NewMessage.Event, reply, m_type):
   if not m_type:
     await event.reply('Reply to media to use this command.')
     return
