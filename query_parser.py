@@ -68,10 +68,11 @@ def parse_tags(query):
     token, emojis = strip_emojis(token)
     for emoji in emojis:
       parsed.append('emoji', emoji, is_neg=token_is_neg)
+    token = token.strip(punctuation)
     if not token:
       continue
 
-    parsed.append('tags', token.strip(punctuation), is_neg=token_is_neg)
+    parsed.append('tags', token, is_neg=token_is_neg)
 
   return parsed
 
