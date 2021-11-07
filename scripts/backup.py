@@ -1,10 +1,17 @@
 # Remember to stop the bot before running this
+# Clones the index to {index}_tmp so you can safely use recreate.py without
+# losing data
 from elasticsearch import Elasticsearch
 
-INDEX_NAME = 'tagbot'
+import sys
+sys.path.insert(0,'..')
+from secrets import ADMIN_HTTP_PASS
+from constants import INDEX_NAME
+
+
 TMP_INDEX = f'{INDEX_NAME}_tmp'
 
-es = Elasticsearch()
+es = Elasticsearch(http_auth=('elastic', ADMIN_HTTP_PASS))
 
 # make index read only
 es.indices.put_settings(

@@ -5,3 +5,5 @@ MAX_MEDIA_PER_USER = 1000
 
 # Telegram limitations
 MAX_RESULTS_PER_PAGE = 50
+
+INDEX_NAME = 'tagbot'

@@ -11,7 +11,8 @@ from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 from utils import acached
 from query_parser import ParsedQuery
 from data_model import TaggedDocument
-from constants import MAX_MEDIA_PER_USER, MAX_RESULTS_PER_PAGE
+from constants import MAX_MEDIA_PER_USER, MAX_RESULTS_PER_PAGE, INDEX_NAME
+from secrets import HTTP_PASS
 
 
 @dataclass
@@ -24,8 +25,7 @@ class CachedCounter:
     return self.real + self.offset
 
 
-es = AsyncElasticsearch()
-INDEX_NAME = 'tagbot'
+es = AsyncElasticsearch(http_auth=('tagbot', HTTP_PASS))
 
 
 def pack_doc_id(owner: int, id: int):
