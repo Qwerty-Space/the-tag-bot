@@ -60,7 +60,8 @@ async def global_help(event, show_help):
   /help <command>
   """
   await event.respond(
-    'Send me any media and reply to it with keywords and I\'ll save it.'
+    'Send me any media and reply to it with keywords and I\'ll save it. '
+    'You can start keywords with ! or - to remove tags.'
     '\n\nYou can recall media that you\'ve saved by using me inline:'
     '\n@TheTagBot <keywords>'
     '\n\nYou can view the help for a command by doing /help <command>'

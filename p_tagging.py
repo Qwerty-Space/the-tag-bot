@@ -69,6 +69,40 @@ async def get_media_generated_attrs(file):
   return attrs
 
 
+async def get_doc_from_file(owner, m_type, file):
+  file_id, access_hash = file.media.id, file.media.access_hash
+  doc = (
+    await db.get_user_media(owner, file_id)
+    or TaggedDocument(
+      owner=owner, id=file_id, access_hash=access_hash, type=m_type
+    )
+  )
+
+  gen_attrs = await get_media_generated_attrs(file)
+  # don't replace user emoji with ones from pack
+  if doc.emoji:
+    gen_attrs.pop('emoji', None)
+  doc = doc.merge(**gen_attrs)
+  doc.last_used = round(time.time())
+
+  return doc
+
+
+async def save_doc_to_db(doc: TaggedDocument):
+  if any(len(tag) > constants.MAX_TAG_LENGTH for tag in doc.tags):
+    raise ValueError(f'Tags are limited to a length of {constants.MAX_TAG_LENGTH}!')
+
+  if len(doc.tags) > constants.MAX_TAGS_PER_FILE:
+    raise ValueError(f'Only {constants.MAX_TAGS_PER_FILE} tags are allowed per file!')
+  if len(doc.emoji) > constants.MAX_EMOJI_PER_FILE:
+    raise ValueError(f'Only {constants.MAX_EMOJI_PER_FILE} emoji are allowed per file!')
+
+  try:
+    await db.update_user_media(doc.owner, doc.id, doc.to_dict())
+  except ValueError:
+    raise
+
+
 @client.on(events.NewMessage())
 @utils.whitelist
 @extract_taggable_media
@@ -80,42 +114,55 @@ async def on_tag(event, reply, m_type):
     return
   if not m_type:
     return 'I don\'t know how to handle that media type yet!'
-  file_id, access_hash = reply.file.media.id, reply.file.media.access_hash
-  owner = event.sender_id
 
   q = parse_tags(m.raw_text)
   if not q.fields:
     return
 
-  for tag in q.get('tags'):
-    if len(tag) > constants.MAX_TAG_LENGTH:
-      return f'Tags are limited to a length of {constants.MAX_TAG_LENGTH}!'
-
-  doc = (
-    await db.get_user_media(owner, file_id)
-    or TaggedDocument(
-      owner=owner, id=file_id, access_hash=access_hash, type=m_type
-    )
-  )
-
-  gen_attrs = await get_media_generated_attrs(reply.file)
-  # don't replace user emoji with ones from pack
-  if doc.emoji:
-    gen_attrs.pop('emoji', None)
-  doc = doc.merge(**gen_attrs)
-  doc.last_used = round(time.time())
+  doc = await get_doc_from_file(event.sender_id, m_type, reply.file)
 
   # calculate new tags and emoji
   doc.tags = (doc.tags | q.get('tags')) - q.get('tags', is_neg=True)
-  if len(doc.tags) > constants.MAX_TAGS_PER_FILE:
-    return f'Only {constants.MAX_TAGS_PER_FILE} tags are allowed per file!'
-
   doc.emoji = (doc.emoji | q.get('emoji')) - q.get('emoji', is_neg=True)
-  if len(doc.emoji) > constants.MAX_EMOJI_PER_FILE:
-    return f'Only {constants.MAX_EMOJI_PER_FILE} emoji are allowed per file!'
 
   try:
-    await db.update_user_media(owner, file_id, doc.to_dict())
+    await save_doc_to_db(doc)
+  except ValueError as e:
+    return f'Error: {e}'
+
+  await event.reply(
+    format_tagged_doc(doc),
+    parse_mode='HTML'
+  )
+
+
+@client.on(events.NewMessage(pattern=r'/set(.+)?$'))
+@utils.whitelist
+@extract_taggable_media
+@add_to_help('set')
+async def set_tags(event: events.NewMessage.Event, reply, m_type, show_help):
+  """
+  Sets (replaces) the tags for media
+  Reply to media to use this command. Note that any existing tags will be lost!
+  Usage: <code>/set [new tags]</code>
+  """
+  if not reply or not m_type or not event.pattern_match[1]:
+    return await show_help()
+
+  q = parse_tags(event.pattern_match[1])
+  if not q.fields:
+    return
+
+  doc = await get_doc_from_file(event.sender_id, m_type, reply.file)
+
+  new_tags, new_emoji = q.get('tags'), q.get('emoji')
+  if new_tags:
+    doc.tags = new_tags
+  if new_emoji:
+    doc.emoji = new_emoji
+
+  try:
+    await save_doc_to_db(doc)
   except ValueError as e:
     return f'Error: {e}'
 

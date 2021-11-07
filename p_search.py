@@ -74,7 +74,7 @@ async def parse(event: events.NewMessage.Event, show_help, query=None):
   """
   Parses a query (for debugging)
   Shows the result of parsing a query, normally you shouldn't have to use this.
-  /parse <query here>
+  Usage <code>/parse [query here]</code>
   """
   query = query or event.pattern_match.group(1)
   if not query:
