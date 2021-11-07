@@ -1,4 +1,5 @@
 import re
+from string import punctuation
 from dataclasses import dataclass
 from collections import defaultdict
 
@@ -70,7 +71,7 @@ def parse_tags(query):
     if not token:
       continue
 
-    parsed.append('tags', token, is_neg=token_is_neg)
+    parsed.append('tags', token.strip(punctuation), is_neg=token_is_neg)
 
   return parsed
 
