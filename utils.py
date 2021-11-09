@@ -9,7 +9,7 @@ WHITELISTED_IDS = {232787997, 151462131}
 def html_format_tags(tags):
   if isinstance(tags, str):
     tags = tags.split(' ')
-  return ' '.join(f'<code>{tag}</code>' for tag in tags)
+  return '\u2800'.join(f'<code>{tag}</code>' for tag in tags)
 
 
 def prefix_matches(needle: str, haystack: list[str]):
