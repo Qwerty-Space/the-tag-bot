@@ -36,7 +36,7 @@ es.security.put_user(
 )
 
 es.indices.create(
-index=INDEX_NAME,
+  index=INDEX_NAME,
   settings=settings['settings'],
   mappings=settings['mappings']
 )
