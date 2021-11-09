@@ -105,4 +105,4 @@ async def parse_from_start(event: events.NewMessage.Event):
   if not query:
     await event.respond('No previous query found.')
     return
-  await parse(event, query)
+  await parse(event, query=query)
