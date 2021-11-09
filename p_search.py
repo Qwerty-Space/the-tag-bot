@@ -37,13 +37,14 @@ async def on_inline(event: events.InlineQuery.Event):
   offset = int(event.offset or 0)
   docs = await db.search_user_media(user_id, q, offset)
 
-  res_type = q.get_first('type')
+  res_type = MediaTypes(q.get_first('type'))
   # 'audio' only works for audio/mpeg, thanks durov
-  if res_type == MediaTypes.audio.value:
-    res_type = MediaTypes.file.value
+  if res_type == MediaTypes.audio:
+    res_type = MediaTypes.file
+  gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
   builder = event.builder
-  if res_type == MediaTypes.photo.value:
+  if res_type == MediaTypes.photo:
     get_result = lambda d: builder.photo(
       id=str(d.id),
       file=InputPhoto(d.id, d.access_hash, b'')
@@ -53,8 +54,8 @@ async def on_inline(event: events.InlineQuery.Event):
       lambda d: builder.document(
         id=str(d.id),
         file=InputDocument(d.id, d.access_hash, b''),
-        type=res_type,
-        title=d.title or truncate_tags(d.tags) or f'[{res_type}]'
+        type=res_type.value,
+        title=d.title or truncate_tags(d.tags) or f'[{res_type.value}]'
       )
     )
   await event.answer(
@@ -63,7 +64,8 @@ async def on_inline(event: events.InlineQuery.Event):
     private=True,
     next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
     switch_pm=f'{len(warnings)} Warning(s)' if warnings else None,
-    switch_pm_param='parse'
+    switch_pm_param='parse',
+    gallery=(res_type in gallery_types)
   )
 
 
