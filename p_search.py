@@ -62,7 +62,7 @@ async def on_inline(event: events.InlineQuery.Event):
     cache_time=0 if warnings else 5,
     private=True,
     next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
-    switch_pm=f'{len(warnings)} warnings' if warnings else None,
+    switch_pm=f'{len(warnings)} Warning(s)' if warnings else None,
     switch_pm_param='parse'
   )
 
