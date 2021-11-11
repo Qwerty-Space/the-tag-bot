@@ -146,10 +146,13 @@ def parse_query(query):
     for s in values:
       matches = prefix_matches(s, field.allowed_values)
       if not matches:
-        warnings.append(f'Value "{s}" for {field.name} is invalid')
+        warnings.append(
+          f'Value "{s}" for {field.name} is invalid, '
+          f'accepted values are one of {", ".join(field.allowed_values)}'
+        )
         continue
       if len(matches) > 1:
-        warnings.append(f'Value "{s}" for {field.name} is ambiguous ({",".join(matches)})')
+        warnings.append(f'Value "{s}" for {field.name} is ambiguous ({", ".join(matches)})')
         continue
       if value:
         continue
