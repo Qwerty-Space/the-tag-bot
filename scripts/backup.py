@@ -13,6 +13,10 @@ TMP_INDEX = f'{INDEX_NAME}_tmp'
 
 es = Elasticsearch(http_auth=('elastic', ADMIN_HTTP_PASS))
 
+if es.indices.exists(index=TMP_INDEX):
+  input('Warning: temp index already exists, press enter to delete it and continue with the backup!')
+  es.indices.delete(index=TMP_INDEX)
+
 # make index read only
 es.indices.put_settings(
   index=INDEX_NAME,
