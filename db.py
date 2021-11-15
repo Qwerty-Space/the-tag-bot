@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from cachetools import TTLCache
 
 from elasticsearch import AsyncElasticsearch, NotFoundError
-from elasticsearch_dsl import Search
+from elasticsearch_dsl import Search, A
 from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 
 from utils import acached
@@ -30,6 +30,17 @@ es = AsyncElasticsearch(http_auth=('tagbot', HTTP_PASS))
 
 def pack_doc_id(owner: int, id: int):
   return base64.urlsafe_b64encode(struct.pack('!QQ', owner, id))
+
+
+async def count_user_media_by_type(owner: int):
+  q = Search()
+  (
+    q.aggs
+    .bucket('user', 'filter', term={'owner': owner})
+    .bucket('types', 'terms', field='type')
+  )
+  r = await es.search(index=INDEX_NAME, size=0, **q.to_dict())
+  return r['aggregations']['user']
 
 
 @acached(TTLCache(1024, ttl=60 * 10))

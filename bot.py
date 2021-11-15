@@ -16,7 +16,7 @@ async def main():
 
   proxy_globals.client = client
   load_callbacks = []
-  for module_name in ['p_cached', 'p_help', 'p_tagging', 'p_search']:
+  for module_name in ['p_cached', 'p_help', 'p_tagging', 'p_search', 'p_stats']:
     proxy_globals.logger = logging.getLogger(module_name)
     module = importlib.import_module(module_name)
     init = getattr(module, 'on_done_loading', None)
