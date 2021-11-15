@@ -4,6 +4,7 @@ import functools
 import time
 
 from telethon import events, tl
+from emoji_extractor import strip_emojis
 
 from proxy_globals import client
 import constants
@@ -51,6 +52,8 @@ async def get_media_generated_attrs(file):
     'is_animated': (file.mime_type == 'application/x-tgsticker'),
   }
 
+  if file.emoji:
+    _, attrs['emoji'] = strip_emojis(file.emoji)
   pack = await p_cached.get_sticker_pack(file.sticker_set)
   if pack:
     attrs['pack_name'] = pack.title
