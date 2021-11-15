@@ -71,17 +71,19 @@
           "mapping": {
             "type": "text",
             "analyzer": "ascii_fold",
+            "norms": false,
             "fields": {
               "prefix_ngram": {
                 "type": "text",
-                "analyzer": "edge_ngram_3_16"
+                "analyzer": "edge_ngram_3_16",
+                "norms": false
               },
               "trigram": {
                 "type": "text",
-                "analyzer": "trigram"
+                "analyzer": "trigram",
+                "norms": false
               }
-            },
-            "norms": false
+            }
           }
         }
       }
