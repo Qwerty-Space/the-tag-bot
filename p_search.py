@@ -25,11 +25,17 @@ async def on_inline_selected(event):
 async def on_inline(event: events.InlineQuery.Event):
   # TODO: highlight matches
   # https://www.elastic.co/guide/en/elasticsearch/reference/current/highlighting.html#matched-fields
-  def truncate_tags(tags):
-    tags = ' '.join(tags)
-    if len(tags) < 128:
-      return tags
-    return tags[:128].rsplit(' ', 1)[0] + '…'
+  def get_doc_title(d):
+    if d.title and not show_types:
+      return d.title
+    out_title = ' '.join(d.tags | d.emoji)
+    if d.title:
+      out_title = f'{d.title}; {out_title}'
+    if len(out_title) >= 128:
+      out_title = out_title[:128].rsplit(' ', 1)[0] + '…'
+    if show_types:
+      return f'[{d.type.value}] {out_title}'
+    return out_title or f'[{d.type.value}]'
 
   user_id = event.query.user_id
   last_query_cache[user_id] = event.text
@@ -41,6 +47,11 @@ async def on_inline(event: events.InlineQuery.Event):
   # 'audio' only works for audio/mpeg, thanks durov
   if res_type == MediaTypes.audio:
     res_type = MediaTypes.file
+  show_types = False
+  # display special document type as files
+  if res_type == MediaTypes.document:
+    res_type = MediaTypes.file
+    show_types = True
   gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
   builder = event.builder
@@ -55,7 +66,7 @@ async def on_inline(event: events.InlineQuery.Event):
         id=str(d.id),
         file=InputDocument(d.id, d.access_hash, b''),
         type=res_type.value,
-        title=d.title or truncate_tags(d.tags) or f'[{res_type.value}]'
+        title=get_doc_title(d)
       )
     )
   await event.answer(

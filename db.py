@@ -83,10 +83,14 @@ async def search_user_media(
   q = (
     Search()
     .filter('term', owner=owner)
-    .filter('term', type=query.get_first('type'))
     .sort('_score', '-last_used')
-    .source(includes=['id', 'access_hash', 'tags', 'filename', 'title'])
+    .source(includes=['id', 'access_hash', 'type', 'tags', 'emoji', 'filename', 'title'])
   )
+  search_type = query.get_first('type')
+  if search_type == 'document':
+    q = q.exclude('term', type='photo')
+  else:
+    q = q.filter('term', type=search_type)
 
   for (field, is_neg), values in query.fields.items():
     func = field_queries.get(field)

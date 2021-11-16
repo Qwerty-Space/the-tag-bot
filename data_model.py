@@ -16,6 +16,8 @@ class MediaTypes(str, Enum):
   video = 'video'
   sticker = 'sticker'
   file = 'file'
+  # special type that means "not photo"
+  document = 'document'
 
   @staticmethod
   def from_media(media):
