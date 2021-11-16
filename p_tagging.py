@@ -4,10 +4,9 @@ import functools
 import time
 
 from telethon import events, tl
-from emoji_extractor import strip_emojis
 
 from proxy_globals import client
-import constants
+from emoji_extractor import strip_emojis
 import p_cached
 from p_help import add_to_help
 from data_model import MediaTypes, TaggedDocument
