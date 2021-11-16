@@ -3,14 +3,21 @@ import mimetypes
 import time
 
 from telethon import events
+from telethon.tl.types import KeyboardButtonSwitchInline
 
 from proxy_globals import client
 from emoji_extractor import strip_emojis
+from data_model import MediaTypes, TaggedDocument
+from query_parser import ParsedQuery, format_tagged_doc, parse_tags
+import db, utils
 import p_cached
 from p_help import add_to_help
-from data_model import TaggedDocument
-from query_parser import format_tagged_doc, parse_tags
-import db, utils
+import p_media_mode
+
+
+def calculate_new_tags(doc: TaggedDocument, q: ParsedQuery):
+  doc.tags = (doc.tags | q.get('tags')) - q.get('tags', is_neg=True)
+  doc.emoji = (doc.emoji | q.get('emoji')) - q.get('emoji', is_neg=True)
 
 
 async def get_media_generated_attrs(file):
@@ -79,10 +86,7 @@ async def on_tag(event, reply, m_type):
     return
 
   doc = await get_doc_from_file(event.sender_id, m_type, reply.file)
-
-  # calculate new tags and emoji
-  doc.tags = (doc.tags | q.get('tags')) - q.get('tags', is_neg=True)
-  doc.emoji = (doc.emoji | q.get('emoji')) - q.get('emoji', is_neg=True)
+  calculate_new_tags(doc, q)
 
   try:
     await db.update_user_media(doc)
@@ -92,6 +96,76 @@ async def on_tag(event, reply, m_type):
   await event.reply(
     format_tagged_doc(doc),
     parse_mode='HTML'
+  )
+
+
+@client.on(events.NewMessage(pattern=r'/add(.+)?$'))
+@utils.whitelist
+@add_to_help('add')
+async def on_add(event: events.NewMessage.Event, show_help):
+  """
+  Allows you to add multiple items at once
+  Usage: <code>/add [new tags]</code>
+  """
+  q = parse_tags(event.pattern_match[1] or '')
+  if q.fields:
+    out_text = 'Send me media to add it to your collection with the following info:'
+    out_text += '\n\n' + q.pretty()
+  else:
+    out_text = (
+      'Send me stickers* to add it to your collection'
+      '\n<b>*Because you did not specify any tags with <code>/add [new tags]</code>, '
+      'I will currently only accept stickers from sticker packs. '
+      'Send <code>/add [new tags]</code> to be able to save other media with the specified tags.</b>'
+    )
+  out_text += '\n\nSend /done when you\'re finished adding media'
+  await p_media_mode.set_user_handler(
+    event.sender_id,
+    on_event=on_add_media,
+    on_done=on_add_done,
+    on_cancel=on_add_cancel,
+    extra_kwargs={
+      'chat': await event.get_input_chat(),
+      'q': q
+    }
+  )
+  await event.respond(out_text, parse_mode='HTML')
+
+
+async def on_add_media(event, m_type, q, chat):
+  doc = await get_doc_from_file(event.sender_id, m_type, event.file)
+  calculate_new_tags(doc, q)
+  # Skip adding if no tags were provided and the document has no tags
+  if not q.fields and not doc.tags and not doc.emoji:
+    return
+
+  try:
+    await db.update_user_media(doc)
+  except ValueError as e:
+    await event.reply(f'Error: {e}')
+    # TODO: cancel only if media limit reached
+    return p_media_mode.Cancel
+
+  await event.reply(
+    format_tagged_doc(doc),
+    parse_mode='HTML'
+  )
+
+
+async def on_add_done(chat, q):
+  await client.send_message(
+    chat,
+    'Done adding media? Now use me inline to search your media!',
+    buttons=[[
+      KeyboardButtonSwitchInline('Search', '', same_peer=True)
+    ]]
+  )
+
+
+async def on_add_cancel(chat, q):
+  await client.send_message(
+    chat,
+    'The previous add operation was cancelled (any media sent was still saved, however)'
   )
 
 
