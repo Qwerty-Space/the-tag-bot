@@ -38,6 +38,14 @@ class ParsedQuery:
   def remove(self, name, is_neg=False):
     del self.fields[name, is_neg]
 
+  def pretty(self):
+    d = defaultdict(list)
+    for (field, is_neg), values in self.fields.items():
+      d[field].extend(('!' if is_neg else '') + value for value in values)
+    return '\n'.join(
+      f'{field}: {" ".join(values)}' for field, values in d.items()
+    )
+
 
 FIELDS = [
   _ParseField('tags', ['s']),

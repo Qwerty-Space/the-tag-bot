@@ -87,15 +87,7 @@ async def parse(event: events.NewMessage.Event, show_help, query=None):
   if warnings:
     out_text += 'Errors:\n' + '\n'.join(warnings) + '\n'
 
-  out_text += '\nParsed fields:'
-
-  parsed = defaultdict(list)
-  for (field, is_neg), values in q.fields.items():
-    f_vals = [('!' if is_neg else '') + value for value in values]
-    parsed[field].extend(f_vals)
-
-  for field, values in parsed.items():
-    out_text += f'\n{field}: {" ".join(values)}'
+  out_text += '\nParsed fields:\n' + q.pretty()
 
   await event.reply(out_text, parse_mode=None)
 
