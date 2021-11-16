@@ -78,7 +78,7 @@ async def cmd_help(event):
     out_lines.append(f'Alias for /{cmd.alias_for.name}')
     cmd = cmd.alias_for
   out_lines.append(cmd.docstring)
-  await event.respond('\n'.join(out_lines))
+  await event.respond('\n'.join(out_lines), parse_mode='HTML')
 
 
 def make_show_help_func(name, event):
