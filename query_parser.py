@@ -3,8 +3,8 @@ from string import punctuation
 from dataclasses import dataclass
 from collections import defaultdict
 
-from utils import prefix_matches
-from data_model import MediaTypeList
+from utils import prefix_matches, html_format_tags
+from data_model import MediaTypeList, TaggedDocument
 from emoji_extractor import strip_emojis
 
 
@@ -53,6 +53,21 @@ ALIAS_TO_FIELD = {
   for field in FIELDS
   for alias in field.aliases
 }
+
+
+def format_tagged_doc(doc: TaggedDocument):
+  info = []
+  for alias in ('t', 'e', 'fn', 'p', 'a'):
+    key = ALIAS_TO_FIELD[alias].name
+    value = getattr(doc, key)
+    if value:
+      info.append(f'{alias}:{value}')
+  return (
+    f'Info for {doc.id}:'
+    f'\ninfo: {" ".join(info)}'
+    f'\ntags: {html_format_tags(doc.tags)}'
+    + (f'\nemoji: {" ".join(doc.emoji)}' if doc.emoji else '')
+  )
 
 
 def parse_tags(query):

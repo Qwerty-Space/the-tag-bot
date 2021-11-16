@@ -1,44 +1,16 @@
 import os
 import mimetypes
-import functools
 import time
 
-from telethon import events, tl
+from telethon import events
 
 from proxy_globals import client
 from emoji_extractor import strip_emojis
 import p_cached
 from p_help import add_to_help
-from data_model import MediaTypes, TaggedDocument
-from query_parser import parse_tags, ALIAS_TO_FIELD
+from data_model import TaggedDocument
+from query_parser import format_tagged_doc, parse_tags
 import db, utils
-
-
-def extract_taggable_media(handler):
-  @functools.wraps(handler)
-  async def wrapper(event, *args, **kwargs):
-    reply = await event.get_reply_message()
-    m_type = MediaTypes.from_media(reply.file.media) if reply and reply.file else None
-    ret = await handler(event, reply=reply, m_type=m_type, *args, **kwargs)
-    if isinstance(ret, str):
-      await event.respond(ret)
-    return ret
-  return wrapper
-
-
-def format_tagged_doc(doc: TaggedDocument):
-  info = []
-  for alias in ('t', 'e', 'fn', 'p', 'a'):
-    key = ALIAS_TO_FIELD[alias].name
-    value = getattr(doc, key)
-    if value:
-      info.append(f'{alias}:{value}')
-  return (
-    f'Info for {doc.id}:'
-    f'\ninfo: {" ".join(info)}'
-    f'\ntags: {utils.html_format_tags(doc.tags)}'
-    + (f'\nemoji: {" ".join(doc.emoji)}' if doc.emoji else '')
-  )
 
 
 async def get_media_generated_attrs(file):
@@ -92,7 +64,7 @@ async def get_doc_from_file(owner, m_type, file):
 
 @client.on(events.NewMessage())
 @utils.whitelist
-@extract_taggable_media
+@utils.extract_taggable_media
 async def on_tag(event, reply, m_type):
   m = event.message
   if m.raw_text[:1] in {'/', '.'}:
@@ -125,7 +97,7 @@ async def on_tag(event, reply, m_type):
 
 @client.on(events.NewMessage(pattern=r'/set(.+)?$'))
 @utils.whitelist
-@extract_taggable_media
+@utils.extract_taggable_media
 @add_to_help('set')
 async def set_tags(event: events.NewMessage.Event, reply, m_type, show_help):
   """
@@ -161,7 +133,7 @@ async def set_tags(event: events.NewMessage.Event, reply, m_type, show_help):
 
 @client.on(events.NewMessage(pattern=r'/tags$'))
 @utils.whitelist
-@extract_taggable_media
+@utils.extract_taggable_media
 @add_to_help('tags')
 async def show_tags(event: events.NewMessage.Event, reply, m_type, show_help):
   """
@@ -186,7 +158,7 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type, show_help):
 
 @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
 @utils.whitelist
-@extract_taggable_media
+@utils.extract_taggable_media
 @add_to_help('delete', 'remove')
 async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
   """

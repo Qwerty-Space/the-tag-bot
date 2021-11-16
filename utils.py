@@ -2,6 +2,8 @@ import functools
 
 from cachetools import keys
 
+from data_model import MediaTypes
+
 
 WHITELISTED_IDS = {232787997, 151462131}
 
@@ -42,4 +44,16 @@ def whitelist(handler):
     if event.sender_id not in WHITELISTED_IDS:
       return
     return await handler(event, *args, **kwargs)
+  return wrapper
+
+
+def extract_taggable_media(handler):
+  @functools.wraps(handler)
+  async def wrapper(event, *args, **kwargs):
+    reply = await event.get_reply_message()
+    m_type = MediaTypes.from_media(reply.file.media) if reply and reply.file else None
+    ret = await handler(event, reply=reply, m_type=m_type, *args, **kwargs)
+    if isinstance(ret, str):
+      await event.respond(ret)
+    return ret
   return wrapper
