@@ -91,21 +91,6 @@ async def get_doc_from_file(owner, m_type, file):
   return doc
 
 
-async def save_doc_to_db(doc: TaggedDocument):
-  if any(len(tag) > constants.MAX_TAG_LENGTH for tag in doc.tags):
-    raise ValueError(f'Tags are limited to a length of {constants.MAX_TAG_LENGTH}!')
-
-  if len(doc.tags) > constants.MAX_TAGS_PER_FILE:
-    raise ValueError(f'Only {constants.MAX_TAGS_PER_FILE} tags are allowed per file!')
-  if len(doc.emoji) > constants.MAX_EMOJI_PER_FILE:
-    raise ValueError(f'Only {constants.MAX_EMOJI_PER_FILE} emoji are allowed per file!')
-
-  try:
-    await db.update_user_media(doc.owner, doc.id, doc.to_dict())
-  except ValueError:
-    raise
-
-
 @client.on(events.NewMessage())
 @utils.whitelist
 @extract_taggable_media
@@ -129,7 +114,7 @@ async def on_tag(event, reply, m_type):
   doc.emoji = (doc.emoji | q.get('emoji')) - q.get('emoji', is_neg=True)
 
   try:
-    await save_doc_to_db(doc)
+    await db.update_user_media(doc)
   except ValueError as e:
     return f'Error: {e}'
 
@@ -165,7 +150,7 @@ async def set_tags(event: events.NewMessage.Event, reply, m_type, show_help):
     doc.emoji = new_emoji
 
   try:
-    await save_doc_to_db(doc)
+    await db.update_user_media(doc)
   except ValueError as e:
     return f'Error: {e}'
 

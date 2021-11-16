@@ -11,7 +11,10 @@ from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 from utils import acached
 from query_parser import ParsedQuery
 from data_model import TaggedDocument
-from constants import MAX_MEDIA_PER_USER, MAX_RESULTS_PER_PAGE, INDEX_NAME
+from constants import (
+  MAX_MEDIA_PER_USER, MAX_EMOJI_PER_FILE, MAX_TAGS_PER_FILE, MAX_TAG_LENGTH,
+  MAX_RESULTS_PER_PAGE, INDEX_NAME
+)
 from secrets import HTTP_PASS
 
 
@@ -111,13 +114,20 @@ async def get_user_media(owner: int, id: int):
     return None
 
 
-async def update_user_media(owner: int, id: int, doc: dict):
-  counter = await count_user_media(owner)
+async def update_user_media(doc: TaggedDocument):
+  if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
+    raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
+  if len(doc.tags) > MAX_TAGS_PER_FILE:
+    raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags are allowed per file!')
+  if len(doc.emoji) > MAX_EMOJI_PER_FILE:
+    raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
+
+  counter = await count_user_media(doc.owner)
   try:
     r = await es.update(
       index=INDEX_NAME,
-      id=pack_doc_id(owner, id),
-      doc=doc,
+      id=pack_doc_id(doc.owner, doc.id),
+      doc=doc.to_dict(),
       doc_as_upsert=(counter.count < MAX_MEDIA_PER_USER)
     )
   except NotFoundError:
