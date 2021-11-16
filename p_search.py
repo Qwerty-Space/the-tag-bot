@@ -28,7 +28,7 @@ async def on_inline(event: events.InlineQuery.Event):
   def get_doc_title(d):
     if d.title and not show_types:
       return d.title
-    out_title = ' '.join(d.tags | d.emoji)
+    out_title = ' '.join(d.tags)
     if d.title:
       out_title = f'{d.title}; {out_title}'
     if len(out_title) >= 128:
@@ -66,7 +66,8 @@ async def on_inline(event: events.InlineQuery.Event):
         id=str(d.id),
         file=InputDocument(d.id, d.access_hash, b''),
         type=res_type.value,
-        title=get_doc_title(d)
+        title=get_doc_title(d),
+        description=''.join(d.emoji) or None
       )
     )
   await event.answer(
