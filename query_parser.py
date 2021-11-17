@@ -27,10 +27,10 @@ class ParsedQuery:
     return (name, is_neg) in self.fields
 
   def get(self, name, is_neg=False):
-    return self.fields[name, is_neg]
+    return self.fields.get((name, is_neg), [])
 
   def get_first(self, name, is_neg=False):
-    return self.fields[name, is_neg][0]
+    return self.fields.get((name, is_neg), [])[0]
 
   def replace(self, name, value, is_neg=False):
     self.fields[name, is_neg] = value
