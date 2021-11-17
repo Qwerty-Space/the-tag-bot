@@ -4,12 +4,13 @@ from cachetools import LRUCache
 
 from telethon import events
 
-from data_model import MediaTypes
+from data_model import MediaTypes, InlineResultID
 from p_help import add_to_help
+from p_media_mode import set_ignore_next
 from proxy_globals import client
 import db, utils, query_parser
 from constants import MAX_RESULTS_PER_PAGE
-from telethon.tl.types import InputDocument, InputPhoto, UpdateBotInlineSend
+from telethon.tl.types import InlineQueryPeerTypeSameBotPM, InputDocument, InputPhoto, UpdateBotInlineSend
 
 
 last_query_cache = LRUCache(128)
@@ -17,7 +18,10 @@ last_query_cache = LRUCache(128)
 
 @client.on(events.Raw(UpdateBotInlineSend))
 async def on_inline_selected(event):
-  await db.update_last_used(event.user_id, int(event.id))
+  id = InlineResultID.unpack(event.id)
+  if id.should_remove:
+    return
+  await db.update_last_used(event.user_id, id.id)
 
 
 @client.on(events.InlineQuery())
@@ -54,16 +58,22 @@ async def on_inline(event: events.InlineQuery.Event):
     show_types = True
   gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
+  should_remove = (
+    q.has('delete')
+    and isinstance(event.query.peer_type, InlineQueryPeerTypeSameBotPM)
+  )
+  set_ignore_next(user_id, should_remove)
+
   builder = event.builder
   if res_type == MediaTypes.photo:
     get_result = lambda d: builder.photo(
-      id=str(d.id),
+      id=InlineResultID(d.id, should_remove).pack(),
       file=InputPhoto(d.id, d.access_hash, b'')
     )
   else:
     get_result = (
       lambda d: builder.document(
-        id=str(d.id),
+        id=InlineResultID(d.id, should_remove).pack(),
         file=InputDocument(d.id, d.access_hash, b''),
         type=res_type.value,
         title=get_doc_title(d),
@@ -72,7 +82,7 @@ async def on_inline(event: events.InlineQuery.Event):
     )
   await event.answer(
     [get_result(d) for d in docs],
-    cache_time=0 if warnings else 5,
+    cache_time=0 if warnings or should_remove else 5,
     private=True,
     next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
     switch_pm=f'{len(warnings)} Warning(s)' if warnings else None,

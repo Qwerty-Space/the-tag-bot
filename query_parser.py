@@ -53,7 +53,8 @@ FIELDS = [
   _ParseField('ext', ['ext', 'e']),
   _ParseField('pack_name', ['pack', 'p']),
   _ParseField('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
-  _ParseField('is_animated', ['animated', 'a'], allowed_values=['yes', 'no'])
+  _ParseField('is_animated', ['animated', 'a'], allowed_values=['yes', 'no']),
+  _ParseField('delete', ['delete', 'remove', 'yeet'], allowed_values=['yes'])
 ]
 
 ALIAS_TO_FIELD = {

@@ -3,11 +3,11 @@ import mimetypes
 import time
 
 from telethon import events
-from telethon.tl.types import KeyboardButtonSwitchInline
+from telethon.tl.types import KeyboardButtonSwitchInline, UpdateBotInlineSend
 
 from proxy_globals import client
 from emoji_extractor import strip_emojis
-from data_model import MediaTypes, TaggedDocument
+from data_model import TaggedDocument, InlineResultID
 from query_parser import ParsedQuery, format_tagged_doc, parse_tags
 import db, utils
 import p_cached
@@ -237,12 +237,27 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type, show_help):
 async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
   """
   Deletes media that you have saved.
-  Reply to media to use this command.
+  Reply to media or use the button below to delete something
   """
 
   if not m_type:
-    return await show_help()
+    return await show_help(buttons=[[
+      KeyboardButtonSwitchInline('Delete', 'delete:yes', same_peer=True)
+    ]])
 
   file_id = reply.file.media.id
   deleted_res = await db.delete_user_media(event.sender_id, file_id)
   await event.reply('Media deleted.' if deleted_res else 'Media not found.')
+
+
+@client.on(events.Raw(UpdateBotInlineSend))
+async def on_inline_delete(event):
+  id = InlineResultID.unpack(event.id)
+  if not id.should_remove:
+    return
+
+  await db.delete_user_media(event.user_id, id.id)
+  await client.send_message(
+    await client.get_input_entity(event.user_id),
+    'Media deleted'
+  )

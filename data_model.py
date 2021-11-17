@@ -1,4 +1,6 @@
 from enum import Enum
+import struct
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 import dataclasses
 from dataclasses import dataclass, field
 import time
@@ -6,6 +8,26 @@ from boltons.setutils import IndexedSet
 
 from telethon import tl
 
+
+@dataclass
+class InlineResultID:
+  PACKED_FMT = '!Q?'
+
+  id: int
+  should_remove: bool = False
+
+  @classmethod
+  def unpack(cls, str_id):
+    args = struct.unpack(
+      cls.PACKED_FMT,
+      urlsafe_b64decode(str_id)
+    )
+    return cls(*args)
+
+  def pack(self):
+    return urlsafe_b64encode(struct.pack(
+      self.PACKED_FMT, *dataclasses.astuple(self)
+    ))
 
 
 class MediaTypes(str, Enum):
