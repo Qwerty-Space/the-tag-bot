@@ -83,8 +83,12 @@ async def cmd_help(event):
 
 
 def make_show_help_func(name, event):
-  async def show_help():
-    await event.respond(HELP_TEXTS[name].docstring, parse_mode='HTML')
+  async def show_help(**kwargs):
+    await event.respond(
+      HELP_TEXTS[name].docstring,
+      parse_mode='HTML',
+      **kwargs
+    )
   return show_help
 
 
