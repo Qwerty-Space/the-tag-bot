@@ -103,7 +103,7 @@ def parse_tags(query):
 
 
 def parse_query(query):
-  def set_current_field(field, span, is_neg=False):
+  def set_current_field(field, is_neg=False):
     nonlocal current_field, negated_field, field_was_used
     if not field_was_used:
       warnings.append(f'Field "{current_field.name}" empty')
@@ -125,7 +125,7 @@ def parse_query(query):
 
     # Newlines reset the field
     if m.group(0) == '\n':
-      set_current_field(default_field, m.span())
+      set_current_field(default_field)
       # prevent warning if field is changed
       field_was_used = True
       continue
@@ -136,7 +136,7 @@ def parse_query(query):
       if not field:
         warnings.append(f'Unknown field "{token}"')
         continue
-      set_current_field(field, m.span(), token_is_neg)
+      set_current_field(field, token_is_neg)
       continue
 
     token, emojis = strip_emojis(token)
@@ -151,7 +151,9 @@ def parse_query(query):
     parsed.append(current_field.name, token, is_neg=is_neg)
     field_was_used = True
     if current_field.allowed_values:
-      set_current_field(default_field, m.span())
+      set_current_field(default_field)
+      # prevent warning if field is changed
+      field_was_used = True
 
   # Use first valid (prefix match) value for fields with .allowed_values
   # if no valid value, use .default if present otherwise delete the field
