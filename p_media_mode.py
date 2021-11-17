@@ -69,8 +69,8 @@ async def on_taggable_media(event):
   should_ignore = event.sender_id in user_ignore_next_via_self
   if event.message.via_bot_id == me.id:
     unset_ignore_next(event.sender_id)
-  if should_ignore and event.message.via_bot_id == me.id:
-    return
+    if should_ignore:
+      return
 
   handler = user_media_handlers.get(event.sender_id)
   if not handler or handler.is_expired():
