@@ -56,7 +56,7 @@ async def on_taggable_media(event):
     return
   handler.refresh_expiry()
   r = await handler.on_event(event, m_type, **handler.extra_kwargs)
-  if id(r) == id(Cancel):
+  if r is Cancel:
     await handler.on_cancel(**handler.extra_kwargs)
     del user_media_handlers[event.sender_id]
 
