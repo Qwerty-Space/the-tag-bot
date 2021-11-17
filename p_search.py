@@ -58,11 +58,10 @@ async def on_inline(event: events.InlineQuery.Event):
     show_types = True
   gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
-  should_remove = (
-    q.has('delete')
-    and isinstance(event.query.peer_type, InlineQueryPeerTypeSameBotPM)
-  )
-  set_ignore_next(user_id, should_remove)
+  is_in_pm = isinstance(event.query.peer_type, InlineQueryPeerTypeSameBotPM)
+  should_remove = q.has('delete') and is_in_pm
+  if is_in_pm:
+    set_ignore_next(user_id, should_remove)
 
   builder = event.builder
   if res_type == MediaTypes.photo:
