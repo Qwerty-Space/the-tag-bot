@@ -15,6 +15,7 @@ async def main():
   await client.start()
 
   proxy_globals.client = client
+  proxy_globals.me = await client.get_me()
   load_callbacks = []
   for module_name in [
     'p_cached', 'p_media_mode', 'p_help',

@@ -5,7 +5,7 @@ from typing import Any, Callable, Awaitable
 
 from telethon import events
 
-from proxy_globals import client, logger
+from proxy_globals import client, logger, me
 from data_model import MediaTypes
 import utils
 
@@ -34,6 +34,7 @@ class MediaHandler:
 # sentinel for cancelling the operation
 Cancel = object()
 user_media_handlers: dict[int, MediaHandler] = {}
+user_ignore_next_via_self: set[int] = set()
 
 
 async def set_user_handler(user_id, *args, **kwargs):
@@ -41,6 +42,19 @@ async def set_user_handler(user_id, *args, **kwargs):
   if handler:
     await handler.on_cancel(**handler.extra_kwargs)
   user_media_handlers[user_id] = MediaHandler(*args, **kwargs)
+
+
+def set_ignore_next(user_id, should_ignore=True):
+  """Sets or removes the flag to ignore the next thing sent via this bot"""
+  if should_ignore:
+    user_ignore_next_via_self.add(user_id)
+  else:
+    user_ignore_next_via_self.discard(user_id)
+
+
+def unset_ignore_next(user_id):
+  """Removes the flag to ignore the next thing sent via this bot"""
+  user_ignore_next_via_self.discard(user_id)
 
 
 @client.on(events.NewMessage())
@@ -51,6 +65,13 @@ async def on_taggable_media(event):
   m_type = MediaTypes.from_media(event.file.media)
   if not m_type:
     return
+
+  should_ignore = event.sender_id in user_ignore_next_via_self
+  if event.message.via_bot_id == me.id:
+    unset_ignore_next(event.sender_id)
+  if should_ignore and event.message.via_bot_id == me.id:
+    return
+
   handler = user_media_handlers.get(event.sender_id)
   if not handler or handler.is_expired():
     return
