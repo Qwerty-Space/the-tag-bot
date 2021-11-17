@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import textwrap
 
 from telethon.events import NewMessage
-from telethon.tl.types import BotCommand, BotCommandScopePeer, BotCommandScopePeerUser, BotCommandScopeUsers, InputPeerChat, InputPeerEmpty, InputPeerUser, InputUser, PeerUser
-from telethon.tl.functions.bots import ResetBotCommandsRequest, SetBotCommandsRequest
+from telethon.tl.types import BotCommand, BotCommandScopeUsers
+from telethon.tl.functions.bots import SetBotCommandsRequest
 
 from proxy_globals import client
 
@@ -57,14 +57,15 @@ def add_to_help(name, *aliases):
 async def global_help(event, show_help):
   """
   Shows help message for a command
-  /help <command>
+  Usage: <code>/help [command]</code>
   """
   await event.respond(
-    'Send me any media and reply to it with keywords and I\'ll save it. '
-    'You can start keywords with ! or - to remove tags.'
-    '\n\nYou can recall media that you\'ve saved by using me inline:'
-    '\n@TheTagBot <keywords>'
-    '\n\nYou can view the help for a command by doing /help <command>'
+    'To save some media, send <code>/add [optional tags]</code>'
+    '\n\nYou can also reply to any media with keywords to save it. '
+    '\nKeywords can start with ! or - to remove those tags, for example <code>-smile</code>.'
+    '\n\nYou can recall media that you\'ve saved by using me inline.'
+    '\n\nIf you need more info about a command send <code>/help [command]</code>',
+    parse_mode='HTML'
   )
 
 
