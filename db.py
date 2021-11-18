@@ -113,7 +113,8 @@ async def search_user_media(
 async def get_user_media(owner: int, id: int, index=INDEX.main):
   try:
     r = await es.get(index=index, id=pack_doc_id(owner, id))
-    return TaggedDocument(**r['_source'])
+    r['_source']['last_used'] = round(time.time())
+    return r if raw else TaggedDocument(**r['_source'])
   except NotFoundError:
     return None
 
@@ -128,7 +129,6 @@ async def update_user_media(doc: TaggedDocument, index=INDEX.main):
 
   counter = await count_user_media(doc.owner)
   try:
-    doc.last_used = round(time.time())
     r = await es.update(
       index=index,
       id=pack_doc_id(doc.owner, doc.id),
