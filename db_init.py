@@ -5,9 +5,8 @@ import hashlib
 from elasticsearch import AsyncElasticsearch, NotFoundError
 
 from secrets import HTTP_PASS, ADMIN_HTTP_PASS
-from constants import ELASTIC_USERNAME, INDEX_NAME, INDEX_TRANSFER_NAME
+from constants import ELASTIC_USERNAME, INDEX
 
-BACKUP_INDEX_NAME = f'{INDEX_NAME}_tmp'
 SETTINGS_HASH_FILE = 'settings.hash'
 es_main = AsyncElasticsearch(http_auth=(ELASTIC_USERNAME, HTTP_PASS))
 logger = logging.getLogger('db_init')
@@ -39,7 +38,7 @@ async def init_user():
       'cluster': ['monitor'],
       'indices': [
         {
-          'names': [INDEX_NAME, BACKUP_INDEX_NAME, INDEX_TRANSFER_NAME],
+          'names': [INDEX.main, INDEX.backup, INDEX.transfer],
           'privileges': ['all']
         }
       ]
@@ -59,11 +58,11 @@ async def init_user():
 
 async def init_main_index():
   settings_are_stale = settings_hash != old_settings_hash
-  main_index_exists = await es_main.indices.exists(index=INDEX_NAME)
+  main_index_exists = await es_main.indices.exists(index=INDEX.main)
 
-  if await es_main.indices.exists(index=BACKUP_INDEX_NAME):
+  if await es_main.indices.exists(index=INDEX.backup):
     logger.error('Backup index already exists!')
-    raise RuntimeError(f'Backup index "{BACKUP_INDEX_NAME}" already exists, bailing out because it might contain data')
+    raise RuntimeError(f'Backup index "{INDEX.backup}" already exists, bailing out because it might contain data')
 
   if not main_index_exists:
     logger.info('Main index not found!')
@@ -77,7 +76,7 @@ async def init_main_index():
     logger.info('Backing up main index...')
     # make index read only
     await es_main.indices.put_settings(
-      index=INDEX_NAME,
+      index=INDEX.main,
       body={
         "settings": {
           "index.blocks.write": True
@@ -85,16 +84,16 @@ async def init_main_index():
       }
     )
     # copy to backup
-    await es_main.indices.clone(index=INDEX_NAME, target=BACKUP_INDEX_NAME)
+    await es_main.indices.clone(index=INDEX.main, target=INDEX.backup)
     # wait for clone to finish
-    await es_main.cluster.health(index=BACKUP_INDEX_NAME, wait_for_status='yellow', timeout='30s')
+    await es_main.cluster.health(index=INDEX.backup, wait_for_status='yellow', timeout='30s')
 
     logger.info('Backup complete, deleting main index...')
-    await es_main.indices.delete(index=INDEX_NAME)
+    await es_main.indices.delete(index=INDEX.main)
 
   logger.info('Creating main index')
   await es_main.indices.create(
-    index=INDEX_NAME,
+    index=INDEX.main,
     settings=settings['settings'],
     mappings=settings['mappings']
   )
@@ -102,12 +101,12 @@ async def init_main_index():
   if main_index_exists:
     logger.info('Restoring backup...')
     await es_main.reindex(body={
-      "source": {"index": BACKUP_INDEX_NAME},
-      "dest": {"index": INDEX_NAME}
+      "source": {"index": INDEX.backup},
+      "dest": {"index": INDEX.main}
     })
 
     logger.info('Deleting backup...')
-    await es_main.indices.delete(index=BACKUP_INDEX_NAME)
+    await es_main.indices.delete(index=INDEX.backup)
 
   logger.info('Writing new settings hash...')
   with open(SETTINGS_HASH_FILE, 'w') as f:
@@ -117,13 +116,13 @@ async def init_main_index():
 async def init_transfer_index():
   logger.info('Creating transfer index...')
   try:
-    await es_main.indices.delete(index=INDEX_TRANSFER_NAME)
+    await es_main.indices.delete(index=INDEX.transfer)
   except NotFoundError:
     logger.info('Previous transfer index not found!')
     pass
 
   await es_main.indices.create(
-    index=INDEX_TRANSFER_NAME,
+    index=INDEX.transfer,
     settings=settings['settings'],
     mappings=settings['mappings']
   )

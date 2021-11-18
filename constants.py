@@ -8,5 +8,7 @@ MAX_RESULTS_PER_PAGE = 50
 
 # db
 ELASTIC_USERNAME = 'tagbot'
-INDEX_NAME = 'tagbot'
-INDEX_TRANSFER_NAME = 'tagbot_transfer'
+class INDEX:
+  main = 'tagbot'
+  backup = 'tagbot_tmp'  # used for migrating when settings changes
+  transfer = 'tagbot_transfer'

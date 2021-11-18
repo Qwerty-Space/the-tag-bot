@@ -4,8 +4,8 @@ import time
 from dataclasses import dataclass
 from cachetools import TTLCache
 
-from elasticsearch import AsyncElasticsearch, NotFoundError
-from elasticsearch_dsl import Search, A
+from elasticsearch import NotFoundError
+from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 
 import db_init
@@ -14,9 +14,8 @@ from query_parser import ParsedQuery
 from data_model import TaggedDocument
 from constants import (
   MAX_MEDIA_PER_USER, MAX_EMOJI_PER_FILE, MAX_TAGS_PER_FILE, MAX_TAG_LENGTH,
-  MAX_RESULTS_PER_PAGE, INDEX_NAME 
+  MAX_RESULTS_PER_PAGE, INDEX
 )
-from secrets import HTTP_PASS
 
 
 @dataclass
@@ -36,26 +35,26 @@ def pack_doc_id(owner: int, id: int):
   return base64.urlsafe_b64encode(struct.pack('!QQ', owner, id))
 
 
-async def count_user_media_by_type(owner: int):
+async def count_user_media_by_type(owner: int, index=INDEX.main):
   q = Search()
   (
     q.aggs
     .bucket('user', 'filter', term={'owner': owner})
     .bucket('types', 'terms', field='type')
   )
-  r = await es.search(index=INDEX_NAME, size=0, **q.to_dict())
+  r = await es.search(index=index, size=0, **q.to_dict())
   return r['aggregations']['user']
 
 
 @acached(TTLCache(1024, ttl=60 * 10))
-async def count_user_media(owner: int):
+async def count_user_media(owner: int, index=INDEX.main):
   q = Search().filter('term', owner=owner)
-  r = await es.count(index=INDEX_NAME, body=q.to_dict())
+  r = await es.count(index=index, body=q.to_dict())
   return CachedCounter(r['count'])
 
 
 async def search_user_media(
-  owner: int, query: ParsedQuery, page: int = 0
+  owner: int, query: ParsedQuery, page: int = 0, index=INDEX.main
 ):
   fuzzy_match = lambda fields, values: MultiMatch(
     query=' '.join(values),
@@ -103,7 +102,7 @@ async def search_user_media(
     q = q.query(sub_q)
 
   r = await es.search(
-    index=INDEX_NAME,
+    index=index,
     size=MAX_RESULTS_PER_PAGE,
     from_=page * MAX_RESULTS_PER_PAGE,
     **q.to_dict()
@@ -111,15 +110,15 @@ async def search_user_media(
   return [TaggedDocument(**o['_source']) for o in r['hits']['hits']]
 
 
-async def get_user_media(owner: int, id: int):
+async def get_user_media(owner: int, id: int, index=INDEX.main):
   try:
-    r = await es.get(index=INDEX_NAME, id=pack_doc_id(owner, id))
+    r = await es.get(index=index, id=pack_doc_id(owner, id))
     return TaggedDocument(**r['_source'])
   except NotFoundError:
     return None
 
 
-async def update_user_media(doc: TaggedDocument):
+async def update_user_media(doc: TaggedDocument, index=INDEX.main):
   if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
     raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
   if len(doc.tags) > MAX_TAGS_PER_FILE:
@@ -130,7 +129,7 @@ async def update_user_media(doc: TaggedDocument):
   counter = await count_user_media(doc.owner)
   try:
     r = await es.update(
-      index=INDEX_NAME,
+      index=index,
       id=pack_doc_id(doc.owner, doc.id),
       doc=doc.to_dict(),
       doc_as_upsert=(counter.count < MAX_MEDIA_PER_USER)
@@ -143,18 +142,18 @@ async def update_user_media(doc: TaggedDocument):
   return r
 
 
-async def update_last_used(owner: int, id: int):
+async def update_last_used(owner: int, id: int, index=INDEX.main):
   return await es.update(
-    index=INDEX_NAME,
+    index=index,
     id=pack_doc_id(owner, id),
     doc={'last_used': round(time.time())}
   )
 
 
-async def delete_user_media(owner: int, id: int):
+async def delete_user_media(owner: int, id: int, index=INDEX.main):
   try:
     r = await es.delete(
-      index=INDEX_NAME,
+      index=index,
       id=pack_doc_id(owner, id)
     )
     (await count_user_media(owner)).offset -= 1
