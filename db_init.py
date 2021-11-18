@@ -30,6 +30,7 @@ except FileNotFoundError:
 
 
 async def init_user():
+  # TODO: skip creating user if already exists with the correct roles
   es_admin = AsyncElasticsearch(http_auth=('elastic', ADMIN_HTTP_PASS))
   logger.info('Updating user role...')
   await es_admin.security.put_role(
