@@ -5,7 +5,7 @@
 If you want to host your own copy of this bot, here's how:
 1. Get [Nix](https://nixos.org/download.html) running on your system (preferably use NixOS)
 1. Install [Elasticsearch](https://www.elastic.co/)
-1. Copy [secrets-example.py](secrets-example.py) to `secrets.py` and edit the `HTTP_PASS` variable to a secure password (for example `hunter2`), this is the password for the tagbot Elasticsearch user, which we will create later
+1. Copy [secrets-example.py](secrets-example.py) to `secrets.py` and edit the `HTTP_PASS` variable to a secure password (for example `hunter2`), this is the password for the Elasticsearch user that the bot will use
 1. Setup [security](https://www.elastic.co/guide/en/elasticsearch/reference/current/security-minimal-setup.html) in Elasticsearch by putting the following into `$ES_PATH_CONF/elasticsearch.yml`:
     ```yaml
     xpack.security.enabled: true
@@ -21,17 +21,11 @@ If you want to host your own copy of this bot, here's how:
     ADMIN_HTTP_PASS = 'elastic user password here'
     ```
 
-1. Run the [setup.py](scripts/setup.py) script located in the scripts directory:
-    ```
-    $ cd scripts
-    $ nix-shell ../shell.nix --run 'python setup.py'
-    ```
-    This will create the `tagbot` Elasticsearch user, configure its roles and create the index
-
 1. Now you can run the bot using `nix-shell` in the repo root:
     ```
     nix-shell shell.nix --run 'python bot.py'
     ```
+    The bot will take care of setting up the Elasticsearch indicies that it needs.
 
 1. Telethon will prompt for your bot token when you first run the bot, when you move it to a server simply copy the `bot.session` file to the server.
 

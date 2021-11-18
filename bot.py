@@ -1,17 +1,19 @@
 import logging
+logging.basicConfig(level=logging.INFO)
 import importlib
 import mimetypes
 
 from telethon import TelegramClient
 
 import proxy_globals
+import db
 
-logging.basicConfig(level=logging.INFO)
 client = TelegramClient('bot', 6, 'eb06d4abfb49dc3eeb1aeb98ae0f581e')
 mimetypes.add_type('application/x-tgsticker', '.tgs')
 
 
 async def main():
+  await db.init()
   await client.start()
 
   proxy_globals.client = client

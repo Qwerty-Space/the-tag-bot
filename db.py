@@ -8,12 +8,13 @@ from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch_dsl import Search, A
 from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
 
+import db_init
 from utils import acached
 from query_parser import ParsedQuery
 from data_model import TaggedDocument
 from constants import (
   MAX_MEDIA_PER_USER, MAX_EMOJI_PER_FILE, MAX_TAGS_PER_FILE, MAX_TAG_LENGTH,
-  MAX_RESULTS_PER_PAGE, INDEX_NAME
+  MAX_RESULTS_PER_PAGE, INDEX_NAME 
 )
 from secrets import HTTP_PASS
 
@@ -27,8 +28,8 @@ class CachedCounter:
   def count(self):
     return self.real + self.offset
 
-
-es = AsyncElasticsearch(http_auth=('tagbot', HTTP_PASS))
+es = db_init.es_main
+init = db_init.init
 
 
 def pack_doc_id(owner: int, id: int):

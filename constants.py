@@ -6,4 +6,7 @@ MAX_MEDIA_PER_USER = 1000
 # Telegram limitations
 MAX_RESULTS_PER_PAGE = 50
 
+# db
+ELASTIC_USERNAME = 'tagbot'
 INDEX_NAME = 'tagbot'
+INDEX_TRANSFER_NAME = 'tagbot_transfer'
