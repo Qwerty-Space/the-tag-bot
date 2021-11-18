@@ -1,4 +1,5 @@
 import base64
+import functools
 import struct
 import time
 from dataclasses import dataclass
@@ -39,7 +40,23 @@ def pack_doc_id(owner: int, id: int):
   return base64.urlsafe_b64encode(struct.pack('!QQ', owner, id))
 
 
-async def count_user_media_by_type(owner: int, index=INDEX.main):
+def get_index(is_transfer):
+  return INDEX.transfer if is_transfer else INDEX.main
+
+
+def resolve_index(func):
+  @functools.wraps(func)
+  def wrapper(*args, **kwargs):
+    index = kwargs.get('index') or INDEX.main
+    if kwargs.pop('is_transfer', None):
+      index = INDEX.transfer
+    kwargs['index'] = index
+    return func(*args, **kwargs)
+  return wrapper
+
+
+@resolve_index
+async def count_user_media_by_type(owner: int, index: str):
   q = Search()
   (
     q.aggs
@@ -51,14 +68,16 @@ async def count_user_media_by_type(owner: int, index=INDEX.main):
 
 
 @acached(TTLCache(1024, ttl=60 * 10))
-async def count_user_media(owner: int, index):
+@resolve_index
+async def count_user_media(owner: int, index: str):
   q = Search().filter('term', owner=owner)
   r = await es.count(index=index, body=q.to_dict())
   return CachedCounter(r['count'])
 
 
+@resolve_index
 async def search_user_media(
-  owner: int, query: ParsedQuery, page: int = 0, index=INDEX.main
+  owner: int, query: ParsedQuery, index: str, page: int = 0
 ):
   fuzzy_match = lambda fields, values: MultiMatch(
     query=' '.join(values),
@@ -114,7 +133,8 @@ async def search_user_media(
   return [TaggedDocument(**o['_source']) for o in r['hits']['hits']]
 
 
-async def get_user_media(owner: int, id: int, index=INDEX.main):
+@resolve_index
+async def get_user_media(owner: int, id: int, index: str):
   try:
     r = await es.get(index=index, id=pack_doc_id(owner, id))
     r['_source']['last_used'] = round(time.time())
@@ -123,7 +143,10 @@ async def get_user_media(owner: int, id: int, index=INDEX.main):
     return None
 
 
-async def update_user_media(doc: TaggedDocument, index=INDEX.main, refresh=False, check_limits=True):
+@resolve_index
+async def update_user_media(
+  doc: TaggedDocument, index: str, refresh=False, check_limits=True
+):
   if check_limits:
     if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
       raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
@@ -132,7 +155,7 @@ async def update_user_media(doc: TaggedDocument, index=INDEX.main, refresh=False
     if len(doc.emoji) > MAX_EMOJI_PER_FILE:
       raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
 
-  counter = await count_user_media(doc.owner, index)
+  counter = await count_user_media(doc.owner, index=index)
   try:
     r = await es.update(
       index=index,
@@ -149,7 +172,8 @@ async def update_user_media(doc: TaggedDocument, index=INDEX.main, refresh=False
   return r
 
 
-async def update_last_used(owner: int, id: int, index=INDEX.main):
+@resolve_index
+async def update_last_used(owner: int, id: int, index: str):
   return await es.update(
     index=index,
     id=pack_doc_id(owner, id),
@@ -157,13 +181,14 @@ async def update_last_used(owner: int, id: int, index=INDEX.main):
   )
 
 
-async def delete_user_media(owner: int, id: int, index=INDEX.main):
+@resolve_index
+async def delete_user_media(owner: int, id: int, index: str):
   try:
     r = await es.delete(
       index=index,
       id=pack_doc_id(owner, id)
     )
-    (await count_user_media(owner, index)).offset -= 1
+    (await count_user_media(owner, index=index)).offset -= 1
     return r
   except NotFoundError:
     return None
@@ -173,7 +198,7 @@ async def copy_to_transfer_index(owner: int, id: int):
   doc = await get_user_media(owner, id)
   if not doc:
     raise ValueError('You have not saved this media')
-  await update_user_media(doc, index=INDEX.transfer, refresh=True, check_limits=False)
+  await update_user_media(doc, is_transfer=True, refresh=True, check_limits=False)
 
 
 async def clear_transfer_index(owner: int, pop=False):
@@ -189,5 +214,5 @@ async def clear_transfer_index(owner: int, pop=False):
     index=INDEX.transfer,
     body=q.to_dict()
   )
-  (await count_user_media(owner, INDEX.transfer)).set(0)
+  (await count_user_media(owner, is_transfer=True)).set(0)
   return docs or r['deleted']

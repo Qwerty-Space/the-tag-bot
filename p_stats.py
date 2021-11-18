@@ -17,10 +17,7 @@ async def stats(event: events.NewMessage.Event, show_help, pre_text='', extra_bu
   """
 
   transfer_type = current_transfer_type(event.sender_id)
-  r = await db.count_user_media_by_type(
-    event.sender_id,
-    INDEX.transfer if transfer_type else INDEX.main
-  )
+  r = await db.count_user_media_by_type(event.sender_id, is_transfer=bool(transfer_type))
   counts = {t['key']: t['doc_count'] for t in r['types']['buckets']}
   if not counts:
     await event.respond('You have not saved any media. Send /start to get started.')

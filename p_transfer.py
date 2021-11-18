@@ -28,7 +28,6 @@ def check_transferring(handler):
   return wrapper
 
 
-
 @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
 @utils.whitelist
 @check_transferring

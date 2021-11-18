@@ -45,9 +45,9 @@ async def on_inline(event: events.InlineQuery.Event):
   last_query_cache[user_id] = event.text
   q, warnings = query_parser.parse_query(event.text)
   offset = int(event.offset or 0)
-  index = INDEX.transfer if q.has('show_transfer') else INDEX.main
+  is_transfer = q.has('show_transfer')
   docs = await db.search_user_media(
-    owner=user_id, query=q, page=offset, index=index
+    owner=user_id, query=q, page=offset, is_transfer=is_transfer
   )
 
   res_type = MediaTypes(q.get_first('type'))
@@ -84,7 +84,7 @@ async def on_inline(event: events.InlineQuery.Event):
     )
   await event.answer(
     [get_result(d) for d in docs],
-    cache_time=0 if warnings or should_remove else 5,
+    cache_time=0 if warnings or should_remove or is_transfer else 5,
     private=True,
     next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
     switch_pm=f'{len(warnings)} Warning(s)' if warnings else None,

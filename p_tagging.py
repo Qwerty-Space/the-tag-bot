@@ -260,10 +260,7 @@ async def on_inline_delete(event):
     return
 
   transfer_type = current_transfer_type(event.user_id)
-  await db.delete_user_media(
-    owner=event.user_id, id=id.id,
-    index=INDEX.transfer if transfer_type else INDEX.main
-  )
+  await db.delete_user_media(event.user_id, id.id, is_transfer=bool(transfer_type))
   await client.send_message(
     await client.get_input_entity(event.user_id),
     'Media deleted' + (f' from {transfer_type}' if transfer_type else '')
