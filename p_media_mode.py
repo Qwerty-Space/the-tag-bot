@@ -96,7 +96,7 @@ async def on_taggable_media(event):
     return
   handler.refresh_expiry()
   if await handler.event(event, m_type) is Cancel:
-    del user_media_handlers[event.sender_id]
+    user_media_handlers.pop(event.sender_id, None)
 
 
 @client.on(events.NewMessage(pattern=r'/done$'))
@@ -105,7 +105,7 @@ async def on_done(event: events.NewMessage.Event):
   handler = user_media_handlers.get(event.sender_id)
   if handler:
     await handler.done()
-    del user_media_handlers[event.sender_id]
+    user_media_handlers.pop(event.sender_id, None)
 
 
 @client.on(events.NewMessage(pattern=r'/cancel$'))
@@ -114,7 +114,7 @@ async def on_cancel(event: events.NewMessage.Event):
   handler = user_media_handlers.get(event.sender_id)
   if handler:
     await handler.cancel()
-    del user_media_handlers[event.sender_id]
+    user_media_handlers.pop(event.sender_id, None)
 
 
 async def expiry_loop():
@@ -129,7 +129,7 @@ async def expiry_loop():
       continue
 
     logger.info(f'Handler {handler.name} for #{user_id} has expired')
-    del user_media_handlers[user_id]
+    user_media_handlers.pop(user_id, None)
     try:
       await handler.cancel()
       # try to avoid flood waits when sending a lot of cancellation messages
