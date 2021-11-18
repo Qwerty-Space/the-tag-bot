@@ -27,15 +27,6 @@ def check_transferring(handler):
   return wrapper
 
 
-def get_export_search_buttons(show_delete=False):
-  buttons = [
-    utils.inline_pm_button('Export item', ''),
-    utils.inline_pm_button('View list', 'pending:yes'),
-  ]
-  if show_delete:
-    buttons.append(utils.inline_pm_button('Remove item', 'pending:yes delete:yes'))
-  return [buttons]
-
 
 @client.on(events.NewMessage(pattern=r'/(delete|remove)$'))
 @utils.whitelist
@@ -71,7 +62,7 @@ async def on_export(event: events.NewMessage.Event, show_help):
       '\nYou can search for an item to add with the button below'
     ),
     parse_mode='HTML',
-    buttons=get_export_search_buttons()
+    buttons=[[utils.inline_pm_button('Export item', '')]]
   )
 
 
@@ -90,7 +81,11 @@ async def on_export_media(event, m_type, chat):
       '\nContinue adding items or send /done to finalize the export'
     ),
     parse_mode='HTML',
-    buttons=get_export_search_buttons(show_delete=True)
+    buttons=[[
+      utils.inline_pm_button('Add more', ''),
+      utils.inline_pm_button('Remove item', 'pending:yes delete:yes'),
+      utils.inline_pm_button('View all', 'pending:yes')
+    ]]
   )
 
 
@@ -102,7 +97,7 @@ async def on_export_done(chat):
   async with client.conversation(chat) as conv:
     await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
     resp = await conv.get_response()
-    if resp.raw_text.startswith('/cancel'):
+    if resp.raw_text.startswith('/'):
       return
 
   file = BytesIO(json.dumps(docs, sort_keys=True).encode('utf-8'))
