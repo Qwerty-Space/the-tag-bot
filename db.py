@@ -123,7 +123,7 @@ async def get_user_media(owner: int, id: int, index=INDEX.main):
     return None
 
 
-async def update_user_media(doc: TaggedDocument, index=INDEX.main, check_limits=True):
+async def update_user_media(doc: TaggedDocument, index=INDEX.main, refresh=False, check_limits=True):
   if check_limits:
     if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
       raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
@@ -138,7 +138,8 @@ async def update_user_media(doc: TaggedDocument, index=INDEX.main, check_limits=
       index=index,
       id=pack_doc_id(doc.owner, doc.id),
       doc=doc.to_dict(),
-      doc_as_upsert=(counter.count < MAX_MEDIA_PER_USER)
+      doc_as_upsert=(counter.count < MAX_MEDIA_PER_USER),
+      refresh=refresh
     )
   except NotFoundError:
     raise ValueError(f'Only {MAX_MEDIA_PER_USER} media allowed per user')
@@ -172,7 +173,7 @@ async def copy_to_transfer_index(owner: int, id: int):
   doc = await get_user_media(owner, id)
   if not doc:
     raise ValueError('You have not saved this media')
-  await update_user_media(doc, index=INDEX.transfer, check_limits=False)
+  await update_user_media(doc, index=INDEX.transfer, refresh=True, check_limits=False)
 
 
 async def clear_transfer_index(owner: int, pop=False):

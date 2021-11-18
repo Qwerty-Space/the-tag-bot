@@ -8,6 +8,7 @@ from proxy_globals import client, me
 import db, utils
 from p_help import add_to_help
 import p_media_mode
+import p_stats
 
 
 def current_transfer_type(user_id: int):
@@ -74,18 +75,16 @@ async def on_export_media(event, m_type, chat):
     await event.reply(f'Error: {e}')
     return
 
-  await event.reply(
-    (
-      f'Media (<code>{file_id}</code>) added to export list.'
-      '\nFor a count of what is about to be exported, run /stats.'
-      '\nContinue adding items or send /done to finalize the export'
+  await p_stats.stats(
+    event,
+    pre_text=(
+      f'Media (<code>{file_id}</code>) added to export list. '
+      'Use /done to finalize the export.\n'
     ),
-    parse_mode='HTML',
-    buttons=[[
-      utils.inline_pm_button('Add more', ''),
-      utils.inline_pm_button('Remove item', 'pending:yes delete:yes'),
-      utils.inline_pm_button('View all', 'pending:yes')
-    ]]
+    extra_buttons=[
+      utils.inline_pm_button('Add', ''),
+      utils.inline_pm_button('Remove', 'pending:yes delete:yes')
+    ]
   )
 
 
