@@ -128,6 +128,7 @@ async def update_user_media(doc: TaggedDocument, index=INDEX.main):
 
   counter = await count_user_media(doc.owner)
   try:
+    doc.last_used = round(time.time())
     r = await es.update(
       index=index,
       id=pack_doc_id(doc.owner, doc.id),
