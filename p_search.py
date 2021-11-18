@@ -9,7 +9,7 @@ from p_help import add_to_help
 from p_media_mode import set_ignore_next
 from proxy_globals import client
 import db, utils, query_parser
-from constants import MAX_RESULTS_PER_PAGE
+from constants import MAX_RESULTS_PER_PAGE, INDEX
 from telethon.tl.types import InlineQueryPeerTypeSameBotPM, InputDocument, InputPhoto, UpdateBotInlineSend
 
 
@@ -45,7 +45,10 @@ async def on_inline(event: events.InlineQuery.Event):
   last_query_cache[user_id] = event.text
   q, warnings = query_parser.parse_query(event.text)
   offset = int(event.offset or 0)
-  docs = await db.search_user_media(user_id, q, offset)
+  index = INDEX.transfer if q.has('show_transfer') else INDEX.main
+  docs = await db.search_user_media(
+    owner=user_id, query=q, page=offset, index=index
+  )
 
   res_type = MediaTypes(q.get_first('type'))
   # 'audio' only works for audio/mpeg, thanks durov

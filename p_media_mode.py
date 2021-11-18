@@ -14,6 +14,7 @@ import utils
 class MediaHandler:
   EXPIRY_TIME = 60 * 10
 
+  name: str
   on_event: Callable[[events.NewMessage.Event], Awaitable[None]]
   on_done: Callable[[Any], Awaitable[None]]
   on_cancel: Callable[[Any], Awaitable[None]]
@@ -30,6 +31,24 @@ class MediaHandler:
   def refresh_expiry(self):
     self.expires_at = time.time() + MediaHandler.EXPIRY_TIME
 
+  async def event(self, event, m_type):
+    r = await self.on_event(event, m_type, **self.extra_kwargs)
+    if r is Cancel:
+      await self.cancel()
+      return r
+
+  async def done(self):
+    r = await self.on_done(**self.extra_kwargs)
+    if r is Cancel:
+      await self.cancel()
+      return r
+
+  async def cancel(self, replaced_with_self=False):
+    await self.on_cancel(
+      replaced_with_self=replaced_with_self,
+      **self.extra_kwargs
+    )
+
 
 # sentinel for cancelling the operation
 Cancel = object()
@@ -37,11 +56,11 @@ user_media_handlers: dict[int, MediaHandler] = {}
 user_ignore_next_via_self: set[int] = set()
 
 
-async def set_user_handler(user_id, *args, **kwargs):
+async def set_user_handler(name, user_id, *args, **kwargs):
   handler = user_media_handlers.get(user_id)
   if handler:
-    await handler.on_cancel(**handler.extra_kwargs)
-  user_media_handlers[user_id] = MediaHandler(*args, **kwargs)
+    await handler.cancel(replaced_with_self=handler.name == name)
+  user_media_handlers[user_id] = MediaHandler(*args, name=name, **kwargs)
 
 
 def set_ignore_next(user_id, should_ignore=True):
@@ -76,9 +95,7 @@ async def on_taggable_media(event):
   if not handler or handler.is_expired():
     return
   handler.refresh_expiry()
-  r = await handler.on_event(event, m_type, **handler.extra_kwargs)
-  if r is Cancel:
-    await handler.on_cancel(**handler.extra_kwargs)
+  if await handler.event(event, m_type) is Cancel:
     del user_media_handlers[event.sender_id]
 
 
@@ -87,7 +104,7 @@ async def on_taggable_media(event):
 async def on_done(event: events.NewMessage.Event):
   handler = user_media_handlers.get(event.sender_id)
   if handler:
-    await handler.on_done(**handler.extra_kwargs)
+    await handler.done()
     del user_media_handlers[event.sender_id]
 
 
@@ -96,7 +113,7 @@ async def on_done(event: events.NewMessage.Event):
 async def on_cancel(event: events.NewMessage.Event):
   handler = user_media_handlers.get(event.sender_id)
   if handler:
-    await handler.on_cancel(**handler.extra_kwargs)
+    await handler.cancel()
     del user_media_handlers[event.sender_id]
 
 
@@ -111,14 +128,14 @@ async def expiry_loop():
     if not handler:
       continue
 
-    logger.info(f'Handler {handler.on_event} for #{user_id} has expired')
+    logger.info(f'Handler {handler.name} for #{user_id} has expired')
     del user_media_handlers[user_id]
     try:
-      await handler.on_cancel(**handler.extra_kwargs)
+      await handler.cancel()
       # try to avoid flood waits when sending a lot of cancellation messages
       await asyncio.sleep(0.5)
     except Exception as e:
-      logger.exception(f'Unhandled exception on expired handler ({handler.on_event}) for #{user_id}', e)
+      logger.exception(f'Unhandled exception on expired handler ({handler.name}) for #{user_id}', e)
 
 
 asyncio.create_task(expiry_loop())

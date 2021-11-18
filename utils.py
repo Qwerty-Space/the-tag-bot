@@ -1,11 +1,16 @@
 import functools
 
 from cachetools import keys
+from telethon.tl.custom.button import Button
 
 from data_model import MediaTypes
 
 
 WHITELISTED_IDS = {232787997, 151462131}
+
+
+def inline_pm_button(text, query=''):
+  return Button.switch_inline(text, query, same_peer=True)
 
 
 def html_format_tags(tags):

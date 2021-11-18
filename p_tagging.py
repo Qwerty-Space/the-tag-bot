@@ -4,6 +4,7 @@ import time
 
 from telethon import events
 from telethon.tl.types import KeyboardButtonSwitchInline, UpdateBotInlineSend
+from constants import INDEX
 
 from proxy_globals import client
 from emoji_extractor import strip_emojis
@@ -13,6 +14,7 @@ import db, utils
 import p_cached
 from p_help import add_to_help
 import p_media_mode
+from p_transfer import current_transfer_type
 
 
 def calculate_new_tags(doc: TaggedDocument, q: ParsedQuery):
@@ -120,7 +122,8 @@ async def on_add(event: events.NewMessage.Event, show_help):
     )
   out_text += '\n\nSend /done when you\'re finished adding media'
   await p_media_mode.set_user_handler(
-    event.sender_id,
+    name='add',
+    user_id=event.sender_id,
     on_event=on_add_media,
     on_done=on_add_done,
     on_cancel=on_add_cancel,
@@ -162,7 +165,9 @@ async def on_add_done(chat, q):
   )
 
 
-async def on_add_cancel(chat, q):
+async def on_add_cancel(chat, q, replaced_with_self):
+  if replaced_with_self:
+    return
   await client.send_message(
     chat,
     'The previous add operation was cancelled (any media sent was still saved, however)'
@@ -256,8 +261,12 @@ async def on_inline_delete(event):
   if not id.should_remove:
     return
 
-  await db.delete_user_media(event.user_id, id.id)
+  transfer_type = current_transfer_type(event.user_id)
+  await db.delete_user_media(
+    owner=event.user_id, id=id.id,
+    index=INDEX.transfer if transfer_type else INDEX.main
+  )
   await client.send_message(
     await client.get_input_entity(event.user_id),
-    'Media deleted'
+    'Media deleted' + (f' from {transfer_type}' if transfer_type else '')
   )

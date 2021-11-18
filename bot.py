@@ -21,7 +21,7 @@ async def main():
   load_callbacks = []
   for module_name in [
     'p_cached', 'p_media_mode', 'p_help',
-    'p_tagging', 'p_search', 'p_stats'
+    'p_transfer', 'p_tagging', 'p_search', 'p_stats'
   ]:
     proxy_globals.logger = logging.getLogger(module_name)
     module = importlib.import_module(module_name)

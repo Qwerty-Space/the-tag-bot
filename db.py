@@ -7,6 +7,7 @@ from cachetools import TTLCache
 from elasticsearch import NotFoundError
 from elasticsearch_dsl import Search
 from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
+from idna.core import valid_contextj
 
 import db_init
 from utils import acached
@@ -26,6 +27,9 @@ class CachedCounter:
   @property
   def count(self):
     return self.real + self.offset
+
+  def set(self, value):
+    self.offset = value - self.real
 
 es = db_init.es_main
 init = db_init.init
@@ -47,7 +51,7 @@ async def count_user_media_by_type(owner: int, index=INDEX.main):
 
 
 @acached(TTLCache(1024, ttl=60 * 10))
-async def count_user_media(owner: int, index=INDEX.main):
+async def count_user_media(owner: int, index):
   q = Search().filter('term', owner=owner)
   r = await es.count(index=index, body=q.to_dict())
   return CachedCounter(r['count'])
@@ -114,20 +118,21 @@ async def get_user_media(owner: int, id: int, index=INDEX.main):
   try:
     r = await es.get(index=index, id=pack_doc_id(owner, id))
     r['_source']['last_used'] = round(time.time())
-    return r if raw else TaggedDocument(**r['_source'])
+    return TaggedDocument(**r['_source'])
   except NotFoundError:
     return None
 
 
-async def update_user_media(doc: TaggedDocument, index=INDEX.main):
-  if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
-    raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
-  if len(doc.tags) > MAX_TAGS_PER_FILE:
-    raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags are allowed per file!')
-  if len(doc.emoji) > MAX_EMOJI_PER_FILE:
-    raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
+async def update_user_media(doc: TaggedDocument, index=INDEX.main, check_limits=True):
+  if check_limits:
+    if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
+      raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
+    if len(doc.tags) > MAX_TAGS_PER_FILE:
+      raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags are allowed per file!')
+    if len(doc.emoji) > MAX_EMOJI_PER_FILE:
+      raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
 
-  counter = await count_user_media(doc.owner)
+  counter = await count_user_media(doc.owner, index)
   try:
     r = await es.update(
       index=index,
@@ -157,7 +162,31 @@ async def delete_user_media(owner: int, id: int, index=INDEX.main):
       index=index,
       id=pack_doc_id(owner, id)
     )
-    (await count_user_media(owner)).offset -= 1
+    (await count_user_media(owner, index)).offset -= 1
     return r
   except NotFoundError:
     return None
+
+
+async def copy_to_transfer_index(owner: int, id: int):
+  doc = await get_user_media(owner, id)
+  if not doc:
+    raise ValueError('You have not saved this media')
+  await update_user_media(doc, index=INDEX.transfer, check_limits=False)
+
+
+async def clear_transfer_index(owner: int, pop=False):
+  q = Search().filter('term', owner=owner)
+  docs = []
+  if pop:
+    r = await es.search(
+      index=INDEX.transfer,
+      **q.source(excludes=['owner', 'last_used', 'created']).to_dict()
+    )
+    docs = [o['_source'] for o in r['hits']['hits']]
+  r = await es.delete_by_query(
+    index=INDEX.transfer,
+    body=q.to_dict()
+  )
+  (await count_user_media(owner, INDEX.transfer)).set(0)
+  return docs or r['deleted']
