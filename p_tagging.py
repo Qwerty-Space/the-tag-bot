@@ -3,7 +3,7 @@ import mimetypes
 import time
 
 from telethon import events
-from telethon.tl.types import KeyboardButtonSwitchInline, UpdateBotInlineSend
+from telethon.tl.types import UpdateBotInlineSend
 from constants import INDEX
 
 from proxy_globals import client
@@ -159,9 +159,7 @@ async def on_add_done(chat, q):
   await client.send_message(
     chat,
     'Done adding media? Now use me inline to search your media!',
-    buttons=[[
-      KeyboardButtonSwitchInline('Search', '', same_peer=True)
-    ]]
+    buttons=[[utils.inline_pm_button('Search', '')]]
   )
 
 
@@ -247,7 +245,7 @@ async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
 
   if not m_type:
     return await show_help(buttons=[[
-      KeyboardButtonSwitchInline('Delete', 'delete:yes', same_peer=True)
+      utils.inline_pm_button('Delete', 'delete:yes')
     ]])
 
   file_id = reply.file.media.id

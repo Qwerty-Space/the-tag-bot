@@ -3,7 +3,6 @@ import json
 from io import BytesIO
 
 from telethon import events
-from telethon.tl.types import KeyboardButtonSwitchInline
 
 from proxy_globals import client, me
 import db, utils
@@ -30,11 +29,11 @@ def check_transferring(handler):
 
 def get_export_search_buttons(show_delete=False):
   buttons = [
-    KeyboardButtonSwitchInline('Export item', '', same_peer=True),
-    KeyboardButtonSwitchInline('View list', 'pending:yes', same_peer=True),
+    utils.inline_pm_button('Export item', ''),
+    utils.inline_pm_button('View list', 'pending:yes'),
   ]
   if show_delete:
-    buttons.append(KeyboardButtonSwitchInline('Remove item', 'pending:yes delete:yes', same_peer=True))
+    buttons.append(utils.inline_pm_button('Remove item', 'pending:yes delete:yes'))
   return [buttons]
 
 
@@ -44,9 +43,7 @@ def get_export_search_buttons(show_delete=False):
 async def delete(event: events.NewMessage.Event, transfer_type):
   await event.reply(
     f'Use the button below to delete an item from your {transfer_type}',
-    buttons=[[
-      KeyboardButtonSwitchInline('Delete', 'pending:yes delete:yes', same_peer=True)
-    ]]
+    buttons=[[utils.inline_pm_button('Delete', 'pending:yes delete:yes')]]
   )
   raise events.StopPropagation
 
