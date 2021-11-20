@@ -6,7 +6,7 @@ from telethon import events
 
 from data_model import MediaTypes, InlineResultID
 from p_help import add_to_help
-from p_media_mode import set_ignore_next
+from p_media_mode import set_delete_next
 from proxy_globals import client
 import db, utils, query_parser
 from constants import MAX_RESULTS_PER_PAGE, INDEX
@@ -19,7 +19,7 @@ last_query_cache = LRUCache(128)
 @client.on(events.Raw(UpdateBotInlineSend))
 async def on_inline_selected(event):
   id = InlineResultID.unpack(event.id)
-  if id.should_remove:
+  if id.skip_update:
     return
   await db.update_last_used(event.user_id, id.id)
 
@@ -62,20 +62,20 @@ async def on_inline(event: events.InlineQuery.Event):
   gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
   is_in_pm = isinstance(event.query.peer_type, InlineQueryPeerTypeSameBotPM)
-  should_remove = q.has('delete') and is_in_pm
+  should_delete = q.has('delete') and is_in_pm
   if is_in_pm:
-    set_ignore_next(user_id, should_remove)
+    set_delete_next(user_id, should_delete)
 
   builder = event.builder
   if res_type == MediaTypes.photo:
     get_result = lambda d: builder.photo(
-      id=InlineResultID(d.id, should_remove).pack(),
+      id=InlineResultID(d.id, should_delete).pack(),
       file=InputPhoto(d.id, d.access_hash, b'')
     )
   else:
     get_result = (
       lambda d: builder.document(
-        id=InlineResultID(d.id, should_remove).pack(),
+        id=InlineResultID(d.id, should_delete).pack(),
         file=InputDocument(d.id, d.access_hash, b''),
         type=res_type.value,
         title=get_doc_title(d),
@@ -84,7 +84,7 @@ async def on_inline(event: events.InlineQuery.Event):
     )
   await event.answer(
     [get_result(d) for d in docs],
-    cache_time=0 if warnings or should_remove or is_transfer else 5,
+    cache_time=0 if warnings or should_delete or is_transfer else 5,
     private=True,
     next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
     switch_pm=f'{len(warnings)} Warning(s)' if warnings else None,

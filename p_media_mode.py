@@ -31,8 +31,8 @@ class MediaHandler:
   def refresh_expiry(self):
     self.expires_at = time.time() + MediaHandler.EXPIRY_TIME
 
-  async def event(self, event, m_type):
-    r = await self.on_event(event, m_type, **self.extra_kwargs)
+  async def event(self, event, m_type, is_delete=False):
+    r = await self.on_event(event, m_type, is_delete, **self.extra_kwargs)
     if r is Cancel:
       await self.cancel()
       return r
@@ -53,7 +53,8 @@ class MediaHandler:
 # sentinel for cancelling the operation
 Cancel = object()
 user_media_handlers: dict[int, MediaHandler] = {}
-user_ignore_next_via_self: set[int] = set()
+user_next_is_delete: set[int] = set()
+default_handler = None
 
 
 async def set_user_handler(name, user_id, *args, **kwargs):
@@ -63,17 +64,15 @@ async def set_user_handler(name, user_id, *args, **kwargs):
   user_media_handlers[user_id] = MediaHandler(*args, name=name, **kwargs)
 
 
-def set_ignore_next(user_id, should_ignore=True):
-  """Sets or removes the flag to ignore the next thing sent via this bot"""
-  if should_ignore:
-    user_ignore_next_via_self.add(user_id)
+def set_delete_next(user_id, should_delete=True):
+  """
+  Sets or removes the flag to send the delete flag for the next taggable media
+  sent via this bot
+  """
+  if should_delete:
+    user_next_is_delete.add(user_id)
   else:
-    user_ignore_next_via_self.discard(user_id)
-
-
-def unset_ignore_next(user_id):
-  """Removes the flag to ignore the next thing sent via this bot"""
-  user_ignore_next_via_self.discard(user_id)
+    user_next_is_delete.discard(user_id)
 
 
 @client.on(events.NewMessage())
@@ -85,17 +84,17 @@ async def on_taggable_media(event):
   if not m_type:
     return
 
-  should_ignore = event.sender_id in user_ignore_next_via_self
-  if event.message.via_bot_id == me.id:
-    unset_ignore_next(event.sender_id)
-    if should_ignore:
-      return
+  should_delete = event.sender_id in user_next_is_delete
+  user_next_is_delete.discard(event.sender_id)
+  should_delete = should_delete and event.message.via_bot_id == me.id
 
   handler = user_media_handlers.get(event.sender_id)
   if not handler or handler.is_expired():
+    if default_handler:
+      await default_handler(event, m_type, should_delete)
     return
   handler.refresh_expiry()
-  if await handler.event(event, m_type) is Cancel:
+  if await handler.event(event, m_type, should_delete) is Cancel:
     user_media_handlers.pop(event.sender_id, None)
 
 

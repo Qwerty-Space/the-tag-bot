@@ -14,7 +14,7 @@ class InlineResultID:
   PACKED_FMT = '!Q?'
 
   id: int
-  should_remove: bool = False
+  skip_update: bool = False
 
   @classmethod
   def unpack(cls, str_id):

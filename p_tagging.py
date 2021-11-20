@@ -14,7 +14,6 @@ import db, utils
 import p_cached
 from p_help import add_to_help
 import p_media_mode
-from p_transfer import current_transfer_type
 
 
 def calculate_new_tags(doc: TaggedDocument, q: ParsedQuery):
@@ -253,15 +252,10 @@ async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
   await event.reply('Media deleted.' if deleted_res else 'Media not found.')
 
 
-@client.on(events.Raw(UpdateBotInlineSend))
-async def on_inline_delete(event):
-  id = InlineResultID.unpack(event.id)
-  if not id.should_remove:
+async def on_taggable_delete(event, m_type, should_delete):
+  if not should_delete:
     return
+  await db.delete_user_media(event.sender_id, event.file.media.id)
+  await event.respond('Media deleted')
 
-  transfer_type = current_transfer_type(event.user_id)
-  await db.delete_user_media(event.user_id, id.id, is_transfer=bool(transfer_type))
-  await client.send_message(
-    await client.get_input_entity(event.user_id),
-    'Media deleted' + (f' from {transfer_type}' if transfer_type else '')
-  )
+p_media_mode.default_handler = on_taggable_delete
