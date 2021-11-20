@@ -19,11 +19,10 @@ class MediaHandler:
   on_done: Callable[[Any], Awaitable[None]]
   on_cancel: Callable[[Any], Awaitable[None]]
   extra_kwargs: dict = field(default_factory=dict)
-  expires_at: float = None
+  expires_at: float = field(init=False, default=None)
 
   def __post_init__(self):
-    if not self.expires_at:
-      self.refresh_expiry()
+    self.refresh_expiry()
 
   def is_expired(self):
     return time.time() >= self.expires_at
