@@ -54,11 +54,10 @@ async def on_inline(event: events.InlineQuery.Event):
   # 'audio' only works for audio/mpeg, thanks durov
   if res_type == MediaTypes.audio:
     res_type = MediaTypes.file
-  show_types = False
+  show_types = (res_type == MediaTypes.document)
   # display special document type as files
-  if res_type == MediaTypes.document:
+  if show_types:
     res_type = MediaTypes.file
-    show_types = True
   gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
   is_in_pm = isinstance(event.query.peer_type, InlineQueryPeerTypeSameBotPM)
