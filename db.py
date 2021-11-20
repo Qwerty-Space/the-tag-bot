@@ -56,13 +56,12 @@ def resolve_index(func):
 
 
 @resolve_index
-async def count_user_media_by_type(owner: int, index: str):
+async def count_user_media_by_type(owner: int, only_marked=False, index: str = None):
   q = Search()
-  (
-    q.aggs
-    .bucket('user', 'filter', term={'owner': owner})
-    .bucket('types', 'terms', field='type')
-  )
+  aggs = q.aggs.bucket('user', 'filter', term={'owner': owner})
+  if only_marked:
+    aggs = aggs.bucket('marked', 'filter', term={'marked': True})
+  aggs = aggs .bucket('types', 'terms', field='type')
   r = await es.search(index=index, size=0, **q.to_dict())
   return r['aggregations']['user']
 
