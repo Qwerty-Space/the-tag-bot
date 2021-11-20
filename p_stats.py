@@ -24,8 +24,8 @@ class Stats:
 
   def pretty(self):
     first_line = f'Total: {self.total}'
-    if self.sub_total:
-      first_line = f'Total: {self.sub_total} out of your {self.total} saved items'
+    if self.sub_total is not None:
+      first_line = f'Total: {self.sub_total} (out of your {self.total} saved items)'
     count_lines = [f'{k}: {v}' for k, v in self.counts.items()]
     return '\n'.join([first_line] + count_lines)
 
