@@ -156,6 +156,9 @@ def parse_query(query):
       # prevent warning if field is changed
       field_was_used = True
 
+  # Emit warning if last field was unused
+  set_current_field(default_field)
+
   # Use first valid (prefix match) value for fields with .allowed_values
   # if no valid value, use .default if present otherwise delete the field
   for field in FIELDS:
