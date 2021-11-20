@@ -110,7 +110,12 @@
         "ignore_above": 256
       },
       "is_animated": {
-        "type": "boolean"
+        "type": "boolean",
+        "null_value": false
+      },
+      "marked": {
+        "type": "boolean",
+        "null_value": false
       },
       "last_used": {
         "type": "long"
