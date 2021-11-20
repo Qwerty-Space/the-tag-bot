@@ -99,6 +99,7 @@ async def search_user_media(
     'pack_name': lambda f, v: fuzzy_ngram([f], v),
     'ext': lambda f, v: fuzzy_match([f], v),
     'is_animated': lambda f, v: Bool(filter=[Term(is_animated=v[0] == 'yes')]),
+    'marked': lambda f, v: Bool(filter=[Term(marked=v[0] == 'yes')]),
     'emoji': lambda f, v: Terms(emoji=v)
   }
 
@@ -144,15 +145,14 @@ async def get_user_media(owner: int, id: int, index: str):
 
 @resolve_index
 async def update_user_media(
-  doc: TaggedDocument, index: str, refresh=False, check_limits=True
+  doc: TaggedDocument, index: str
 ):
-  if check_limits:
-    if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
-      raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
-    if len(doc.tags) > MAX_TAGS_PER_FILE:
-      raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags are allowed per file!')
-    if len(doc.emoji) > MAX_EMOJI_PER_FILE:
-      raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
+  if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
+    raise ValueError(f'Tags are limited to a length of {MAX_TAG_LENGTH}!')
+  if len(doc.tags) > MAX_TAGS_PER_FILE:
+    raise ValueError(f'Only {MAX_TAGS_PER_FILE} tags are allowed per file!')
+  if len(doc.emoji) > MAX_EMOJI_PER_FILE:
+    raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
 
   counter = await count_user_media(doc.owner, index=index)
   try:
@@ -161,7 +161,6 @@ async def update_user_media(
       id=pack_doc_id(doc.owner, doc.id),
       doc=doc.to_dict(),
       doc_as_upsert=(counter.count < MAX_MEDIA_PER_USER),
-      refresh=refresh
     )
   except NotFoundError:
     raise ValueError(f'Only {MAX_MEDIA_PER_USER} media allowed per user')
@@ -194,25 +193,48 @@ async def delete_user_media(owner: int, id: int, index: str):
     return None
 
 
-async def copy_to_transfer_index(owner: int, id: int):
-  doc = await get_user_media(owner, id)
-  if not doc:
-    raise ValueError('You have not saved this media')
-  await update_user_media(doc, is_transfer=True, refresh=True, check_limits=False)
-
-
-async def clear_transfer_index(owner: int, pop=False):
-  q = Search().filter('term', owner=owner)
-  docs = []
-  if pop:
-    r = await es.search(
-      index=INDEX.transfer,
-      **q.source(excludes=['owner', 'last_used', 'created']).to_dict()
+@resolve_index
+async def mark_user_media(owner: int, id: int, marked=True, index: str = None):
+  try:
+    return await es.update(
+      index=index,
+      id=pack_doc_id(owner, id),
+      doc={
+        'marked': marked,
+        'last_used': round(time.time())
+      },
+      refresh=True
     )
-    docs = [o['_source'] for o in r['hits']['hits']]
-  r = await es.delete_by_query(
-    index=INDEX.transfer,
-    body=q.to_dict()
+  except NotFoundError:
+    raise ValueError('You have not saved this media')
+
+
+@resolve_index
+async def mark_all_user_media(owner: int, marked: bool, index: str):
+  q = Search().filter('term', owner=owner)
+  if marked:
+    q = q.exclude('term', marked=True)
+  else:
+    q = q.filter('term', marked=True)
+  return await es.update_by_query(
+    index=index,
+    body=q.to_dict() | {
+      'script': {
+        'source': 'ctx._source.marked = params.marked',
+        'params': { 'marked': marked }
+      }
+    }
   )
-  (await count_user_media(owner, is_transfer=True)).set(0)
-  return docs or r['deleted']
+
+
+@resolve_index
+async def get_marked_user_media(
+  owner: int,
+  excludes=['owner', 'last_used', 'created', 'marked'],
+  index: str = None
+):
+  q = Search().filter('term', owner=owner).filter('term', marked=True)
+  if excludes:
+    q = q.source(excludes=excludes)
+  r = await es.search(index=index, **q.to_dict(), size=10000)
+  return [o['_source'] for o in r['hits']['hits']]

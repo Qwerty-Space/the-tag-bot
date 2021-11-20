@@ -34,7 +34,7 @@ def check_transferring(handler):
 async def delete(event: events.NewMessage.Event, transfer_type):
   await event.reply(
     f'Use the button below to delete an item from your {transfer_type}',
-    buttons=[[utils.inline_pm_button('Delete', 'pending:yes delete:yes')]]
+    buttons=[[utils.inline_pm_button('Delete', 'marked:y delete:y')]]
   )
   raise events.StopPropagation
 
@@ -46,6 +46,7 @@ async def on_export(event: events.NewMessage.Event, show_help):
   """
   Exports part of or all of your data to share with friends
   """
+  await db.mark_all_user_media(event.sender_id, False)
   await p_media_mode.set_user_handler(
     name='export',
     user_id=event.sender_id,
@@ -62,35 +63,50 @@ async def on_export(event: events.NewMessage.Event, show_help):
       '\nYou can search for an item to add with the button below'
     ),
     parse_mode='HTML',
-    buttons=[[utils.inline_pm_button('Export item', '')]]
+    buttons=[[utils.inline_pm_button('Export item', 'marked:n')]]
   )
 
 
-async def on_export_media(event, m_type, chat):
+async def on_export_media(event, m_type, is_delete, chat):
   file_id = event.file.media.id
   try:
-    await db.copy_to_transfer_index(event.sender_id, file_id)
+    await db.mark_user_media(event.sender_id, file_id, not is_delete)
   except ValueError as e:
     await event.reply(f'Error: {e}')
     return
 
-  await p_stats.stats(
-    event,
-    pre_text=(
-      f'Media (<code>{file_id}</code>) added to export list. '
-      'Use /done to finalize the export.\n'
-    ),
-    extra_buttons=[
-      utils.inline_pm_button('Add', ''),
-      utils.inline_pm_button('Remove', 'pending:yes delete:yes')
-    ]
+  msg = [
+    f'{"Removed" if is_delete else "Added"} <code>{file_id}</code> to the export\n'
+  ]
+
+  stats = await p_stats.get_stats(event.sender_id, only_marked=True)
+  buttons = [utils.inline_pm_button('Add', 'marked:n')]
+
+  if stats.sub_total:
+    msg.append(f'Here\'s a summary of what will be exported:\n{stats.pretty()}\n')
+    msg.append(
+      'You can add or remove some items with the buttons below, '
+      'use /done to finalize the export, or /cancel it.'
+    )
+    buttons.append(utils.inline_pm_button('Remove', 'marked:y delete:y'))
+  else:
+    msg.append(
+      'No items are marked to be exported, use the button below '
+      'to add some or /cancel the export.'
+    )
+
+  await event.respond(
+    '\n'.join(msg),
+    parse_mode='HTML',
+    buttons=[buttons]
   )
 
 
 async def on_export_done(chat):
-  docs = await db.clear_transfer_index(chat.user_id, pop=True)
+  docs = await db.get_marked_user_media(chat.user_id)
   if not docs:
     return p_media_mode.Cancel
+  await db.mark_all_user_media(chat.user_id, False)
 
   async with client.conversation(chat) as conv:
     await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
@@ -102,19 +118,27 @@ async def on_export_done(chat):
   file.name = f'{resp.raw_text}.json' 
   await client.send_file(
     chat,
-    caption=f'/import\nForward to @{me.username} to import this collection',
+    caption=(
+      f'/import\nForward to @{me.username} to import'
+      f' this collection of {len(docs)} items'
+    ),
     file=file,
     force_document=True
   )
 
 
 async def on_export_cancel(chat, replaced_with_self):
-  num_deleted = await db.clear_transfer_index(chat.user_id)
+  r = await db.mark_all_user_media(chat.user_id, False)
+  num_unmarked = r['updated']
   if replaced_with_self:
     return
+
   await client.send_message(
     chat,
-    f'The export of {num_deleted} item(s) was cancelled.'
-    if num_deleted else
+    f'The export of {num_unmarked} item(s) was cancelled.'
+    if num_unmarked else
     'The export was cancelled.'
   )
+
+# add from query (for export)
+# delete from query

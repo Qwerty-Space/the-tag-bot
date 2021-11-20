@@ -55,7 +55,8 @@ FIELDS = [
   _ParseField('type', ['type', 't'], allowed_values=MediaTypeList, default='sticker'),
   _ParseField('is_animated', ['animated', 'a'], allowed_values=['yes', 'no']),
   _ParseField('delete', ['delete', 'remove', 'yeet'], allowed_values=['yes']),
-  _ParseField('show_transfer', ['pending'], allowed_values=['yes'])
+  _ParseField('show_transfer', ['pending'], allowed_values=['yes']),
+  _ParseField('marked', ['m', 'marked'], allowed_values=['yes', 'no']),
 ]
 
 ALIAS_TO_FIELD = {
@@ -78,6 +79,7 @@ def format_tagged_doc(doc: TaggedDocument):
     f'\ntags: {html_format_tags(doc.tags)}'
     + (f'\nemoji: {" ".join(doc.emoji)}' if doc.emoji else '')
     + (f'\ntitle: {doc.title}' if doc.title else '')
+    + (f'\nmarked: yes' if doc.marked else '')
   )
 
 
