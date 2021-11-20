@@ -89,7 +89,7 @@ async def search_user_media(
   fuzzy_ngram = lambda fields, values: fuzzy_match(
     [
       f for field in fields for f in
-      [f'{field}', f'{field}.prefix_ngram^2', f'{field}.trigram']
+      [f'{field}^3', f'{field}.prefix_ngram^2', f'{field}.trigram']
     ],
     values
   )
