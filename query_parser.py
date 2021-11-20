@@ -74,7 +74,7 @@ def format_tagged_doc(doc: TaggedDocument):
     if value:
       info.append(f'{alias}:{value}')
   return (
-    f'Info for {doc.id}:'
+    f'Info for <code>{doc.id}</code>:'
     f'\ninfo: {" ".join(info)}'
     f'\ntags: {html_format_tags(doc.tags)}'
     + (f'\nemoji: {" ".join(doc.emoji)}' if doc.emoji else '')
