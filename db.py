@@ -184,11 +184,12 @@ async def update_last_used(owner: int, id: int, index: str):
 @resolve_index
 async def delete_user_media(owner: int, id: int, index: str):
   try:
+    count = await count_user_media(owner, index=index)
     r = await es.delete(
       index=index,
       id=pack_doc_id(owner, id)
     )
-    (await count_user_media(owner, index=index)).offset -= 1
+    count.offset -= 1
     return r
   except NotFoundError:
     return None
