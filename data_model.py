@@ -85,6 +85,7 @@ class TaggedDocument:
   last_used: int = 0
   tags: IndexedSet[str] = field(default_factory=IndexedSet)
   emoji: IndexedSet[str] = field(default_factory=IndexedSet)
+  marked: bool = False
 
   def __post_init__(self):
     t = round(time.time())
