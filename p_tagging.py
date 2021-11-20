@@ -134,7 +134,9 @@ async def on_add(event: events.NewMessage.Event, show_help):
   await event.respond(out_text, parse_mode='HTML')
 
 
-async def on_add_media(event, m_type, q, chat):
+async def on_add_media(event, m_type, is_delete, q, chat):
+  if is_delete:
+    return await on_taggable_delete(event, m_type, is_delete)
   doc = await get_doc_from_file(event.sender_id, m_type, event.file)
   calculate_new_tags(doc, q)
   # Skip adding if no tags were provided and the document has no tags
@@ -248,14 +250,14 @@ async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
     ]])
 
   file_id = reply.file.media.id
-  deleted_res = await db.delete_user_media(event.sender_id, file_id)
-  await event.reply('Media deleted.' if deleted_res else 'Media not found.')
+  deleted = await db.delete_user_media(event.sender_id, file_id)
+  await event.reply('Media deleted.' if deleted else 'Media not found.')
 
 
-async def on_taggable_delete(event, m_type, should_delete):
-  if not should_delete:
+async def on_taggable_delete(event, m_type, is_delete):
+  if not is_delete:
     return
-  await db.delete_user_media(event.sender_id, event.file.media.id)
-  await event.respond('Media deleted')
+  deleted = await db.delete_user_media(event.sender_id, event.file.media.id)
+  await event.respond('Media deleted.' if deleted else 'Media not found.')
 
 p_media_mode.default_handler = on_taggable_delete

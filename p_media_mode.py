@@ -32,7 +32,12 @@ class MediaHandler:
     self.expires_at = time.time() + MediaHandler.EXPIRY_TIME
 
   async def event(self, event, m_type, is_delete=False):
-    r = await self.on_event(event, m_type, is_delete, **self.extra_kwargs)
+    r = await self.on_event(
+      event=event,
+      m_type=m_type,
+      is_delete=is_delete,
+      **self.extra_kwargs
+    )
     if r is Cancel:
       await self.cancel()
       return r
@@ -57,6 +62,11 @@ user_next_is_delete: set[int] = set()
 default_handler = None
 
 
+def get_user_handler_name(user_id):
+  handler = user_media_handlers.get(user_id)
+  return handler.name if handler else None
+
+
 async def set_user_handler(name, user_id, *args, **kwargs):
   handler = user_media_handlers.get(user_id)
   if handler:
@@ -64,12 +74,12 @@ async def set_user_handler(name, user_id, *args, **kwargs):
   user_media_handlers[user_id] = MediaHandler(*args, name=name, **kwargs)
 
 
-def set_delete_next(user_id, should_delete=True):
+def set_delete_next(user_id, is_delete=True):
   """
   Sets or removes the flag to send the delete flag for the next taggable media
   sent via this bot
   """
-  if should_delete:
+  if is_delete:
     user_next_is_delete.add(user_id)
   else:
     user_next_is_delete.discard(user_id)
@@ -84,17 +94,17 @@ async def on_taggable_media(event):
   if not m_type:
     return
 
-  should_delete = event.sender_id in user_next_is_delete
+  is_delete = event.sender_id in user_next_is_delete
   user_next_is_delete.discard(event.sender_id)
-  should_delete = should_delete and event.message.via_bot_id == me.id
+  is_delete = is_delete and event.message.via_bot_id == me.id
 
   handler = user_media_handlers.get(event.sender_id)
   if not handler or handler.is_expired():
     if default_handler:
-      await default_handler(event, m_type, should_delete)
+      await default_handler(event=event, m_type=m_type, is_delete=is_delete)
     return
   handler.refresh_expiry()
-  if await handler.event(event, m_type, should_delete) is Cancel:
+  if await handler.event(event, m_type, is_delete) is Cancel:
     user_media_handlers.pop(event.sender_id, None)
 
 
