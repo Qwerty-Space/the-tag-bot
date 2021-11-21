@@ -89,8 +89,8 @@ class UserMediaHandlerHardLimit(UserMediaHandler):
   dies_at: float = field(init=False, default=None)
 
   def __post_init__(self):
+    super().__post_init__()
     self.dies_at = time.time() + HARD_EXPIRY_TIME
-    self.refresh_expiry()
 
   def is_expired(self):
     cur_time = time.time()
