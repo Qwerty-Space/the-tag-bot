@@ -1,16 +1,17 @@
 import base64
+import json
 import functools
 import struct
 import time
 from dataclasses import dataclass
+from typing import Callable
 from cachetools import TTLCache
 
 from elasticsearch import NotFoundError
 from elasticsearch_dsl import Search
-from elasticsearch_dsl.query import MultiMatch, Terms, Bool, Term
-from idna.core import valid_contextj
 
 import db_init
+from gen_search_query import gen_search_query
 from utils import acached
 from query_parser import ParsedQuery
 from data_model import TaggedDocument
@@ -78,51 +79,9 @@ async def count_user_media(owner: int, index: str):
 async def search_user_media(
   owner: int, query: ParsedQuery, index: str, page: int = 0
 ):
-  fuzzy_match = lambda fields, values: MultiMatch(
-    query=' '.join(values),
-    type='most_fields',
-    fields=fields,
-    operator='and',
-    fuzziness='AUTO:4,6',  # disable fuzzy for trigrams
-    prefix_length=1
+  q = gen_search_query(
+    owner, query, includes=['id', 'access_hash', 'type', 'tags', 'emoji', 'filename', 'title']
   )
-  fuzzy_ngram = lambda fields, values: fuzzy_match(
-    [
-      f for field in fields for f in
-      [f'{field}^3', f'{field}.prefix_ngram^2', f'{field}.trigram']
-    ],
-    values
-  )
-  field_queries = {
-    'tags': lambda f, v: fuzzy_ngram([f, 'title'], v),
-    'filename': lambda f, v: fuzzy_ngram([f, 'title'], v),
-    'pack_name': lambda f, v: fuzzy_ngram([f], v),
-    'ext': lambda f, v: fuzzy_match([f], v),
-    'is_animated': lambda f, v: Bool(filter=[Term(is_animated=v[0] == 'yes')]),
-    'marked': lambda f, v: Bool(filter=[Term(marked=v[0] == 'yes')]),
-    'emoji': lambda f, v: Terms(emoji=v)
-  }
-
-  q = (
-    Search()
-    .filter('term', owner=owner)
-    .sort('_score', '-last_used')
-    .source(includes=['id', 'access_hash', 'type', 'tags', 'emoji', 'filename', 'title'])
-  )
-  search_type = query.get_first('type')
-  if search_type == 'document':
-    q = q.exclude('term', type='photo')
-  else:
-    q = q.filter('term', type=search_type)
-
-  for (field, is_neg), values in query.fields.items():
-    func = field_queries.get(field)
-    if not func:
-      continue
-    sub_q = func(field, values)
-    if is_neg:
-      sub_q = ~sub_q
-    q = q.query(sub_q)
 
   r = await es.search(
     index=index,
@@ -130,7 +89,10 @@ async def search_user_media(
     from_=page * MAX_RESULTS_PER_PAGE,
     **q.to_dict()
   )
-  return [TaggedDocument(**o['_source']) for o in r['hits']['hits']]
+  return (
+    r['hits']['total']['value'],
+    [TaggedDocument(**o['_source']) for o in r['hits']['hits']]
+  )
 
 
 @resolve_index
@@ -210,12 +172,22 @@ async def mark_user_media(owner: int, id: int, marked=True, index: str = None):
 
 
 @resolve_index
-async def mark_all_user_media(owner: int, marked: bool, index: str):
+async def mark_all_user_media(
+  owner: int,
+  marked: bool,
+  refresh: bool = False,
+  query_gen: Callable = None,
+  index: str = None
+):
   q = Search().filter('term', owner=owner)
   if marked:
     q = q.exclude('term', marked=True)
   else:
     q = q.filter('term', marked=True)
+
+  if query_gen:
+    q = query_gen(q)
+
   return await es.update_by_query(
     index=index,
     body=q.to_dict() | {
@@ -223,7 +195,26 @@ async def mark_all_user_media(owner: int, marked: bool, index: str):
         'source': 'ctx._source.marked = params.marked',
         'params': { 'marked': marked }
       }
-    }
+    },
+    refresh=refresh
+  )
+
+
+@resolve_index
+async def mark_all_user_media_from_query(
+  owner: int,
+  query: ParsedQuery,
+  marked: bool,
+  index: str = None
+):
+  return await mark_all_user_media(
+    owner=owner,
+    marked=marked,
+    refresh=True,
+    query_gen=lambda q: gen_search_query(
+      owner, query, initial_q=q
+    ),
+    index=index
   )
 
 

@@ -1,19 +1,25 @@
-from collections import defaultdict
-from itertools import chain
-from cachetools import LRUCache
+from dataclasses import dataclass, field
+from random import randint
 
+from cachetools import TTLCache
 from telethon import events
 
 from data_model import MediaTypes, InlineResultID
 from p_help import add_to_help
-from p_media_mode import set_delete_next, get_user_handler_name
+import p_media_mode
 from proxy_globals import client
 import db, utils, query_parser
-from constants import MAX_RESULTS_PER_PAGE, INDEX
+from constants import MAX_RESULTS_PER_PAGE
 from telethon.tl.types import InlineQueryPeerTypeSameBotPM, InputDocument, InputPhoto, UpdateBotInlineSend
 
 
-last_query_cache = LRUCache(128)
+# TODO: cache PM separately from others
+last_query_cache = TTLCache(maxsize=float('inf'), ttl=60 * 30)
+
+@dataclass
+class CachedQuery:
+  query: str
+  id: str = field(default_factory=lambda: f'{randint(0, 0xFFFFFFFF):08X}')
 
 
 @client.on(events.Raw(UpdateBotInlineSend))
@@ -24,6 +30,7 @@ async def on_inline_selected(event):
   await db.update_last_used(event.user_id, id.id)
 
 
+# TODO: refactor blocks into subfunctions
 @client.on(events.InlineQuery())
 @utils.whitelist
 async def on_inline(event: events.InlineQuery.Event):
@@ -42,11 +49,12 @@ async def on_inline(event: events.InlineQuery.Event):
     return out_title or f'[{d.type.value}]'
 
   user_id = event.query.user_id
-  last_query_cache[user_id] = event.text
+  last_query_cache[user_id] = CachedQuery(event.text)
+  cache_id = last_query_cache[user_id].id
   q, warnings = query_parser.parse_query(event.text)
   offset = int(event.offset or 0)
-  is_transfer = q.has('show_transfer')
-  docs = await db.search_user_media(
+  is_transfer = q.has('show_transfer')  # TODO: put in db module
+  total, docs = await db.search_user_media(
     owner=user_id, query=q, page=offset, is_transfer=is_transfer
   )
 
@@ -60,11 +68,19 @@ async def on_inline(event: events.InlineQuery.Event):
     res_type = MediaTypes.file
   gallery_types = {MediaTypes.gif, MediaTypes.sticker, MediaTypes.photo, MediaTypes.video}
 
+  media_mode_handler = p_media_mode.get_user_handler(user_id)
   is_in_pm = isinstance(event.query.peer_type, InlineQueryPeerTypeSameBotPM)
-  skip_update = q.has('delete') and is_in_pm
+  should_delete = q.has('delete') and is_in_pm
   if is_in_pm:
-    set_delete_next(user_id, skip_update)
-  skip_update = skip_update or (get_user_handler_name(user_id) and is_in_pm)
+    p_media_mode.set_delete_next(user_id, should_delete)
+  skip_update = should_delete or (media_mode_handler and is_in_pm)
+
+  # TODO: make this a method of the media mode handler
+  switch_pm_text = None
+  switch_pm_param = 'parse'
+  if media_mode_handler and media_mode_handler.inline_start:
+    switch_pm_text = ('Remove all from ' if should_delete else 'Add all to ') + media_mode_handler.name
+    switch_pm_param = f'{media_mode_handler.name}_{cache_id}'
 
   builder = event.builder
   if res_type == MediaTypes.photo:
@@ -86,9 +102,9 @@ async def on_inline(event: events.InlineQuery.Event):
     [get_result(d) for d in docs],
     cache_time=0 if warnings or skip_update or is_transfer else 5,
     private=True,
-    next_offset=f'{offset + 1}' if len(docs) >= MAX_RESULTS_PER_PAGE else None,
-    switch_pm=f'{len(warnings)} Warning(s)' if warnings else None,
-    switch_pm_param='parse',
+    next_offset=f'{offset + 1}' if total > MAX_RESULTS_PER_PAGE else None,
+    switch_pm=f'{len(warnings)} Warning(s)' if warnings else switch_pm_text,
+    switch_pm_param=switch_pm_param,
     gallery=(res_type in gallery_types)
   )
 
@@ -124,3 +140,31 @@ async def parse_from_start(event: events.NewMessage.Event):
     await event.respond('No previous query found.')
     return
   await parse(event, query=query)
+
+
+@client.on(events.NewMessage(pattern=r'/start parse$'))
+@utils.whitelist
+async def parse_from_start(event: events.NewMessage.Event):
+  query = last_query_cache.get(event.sender_id, None)
+  if not query:
+    await event.respond('No previous query found.')
+    return
+  await parse(event, query=query)
+
+
+# TODO: move this to media mode plugin
+@client.on(events.NewMessage(pattern=r'/start (\w+)_([\dABCDEF]{8})$'))
+@utils.whitelist
+async def media_mode_start(event: events.NewMessage.Event):
+  name = event.pattern_match[1]
+  handler = p_media_mode.get_user_handler(event.sender_id)
+  if not handler or handler.name != name or not handler.inline_start:
+    return
+
+  query = last_query_cache.get(event.sender_id, None)
+  cache_id = event.pattern_match[2]
+  if not query or query.id != cache_id:
+    await event.respond('Error: query not found, please try again')
+    return
+  q, warnings = query_parser.parse_query(query.query)
+  await handler.inline_start(event, q)

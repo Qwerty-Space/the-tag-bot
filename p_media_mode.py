@@ -10,6 +10,8 @@ from data_model import MediaTypes
 import utils
 
 
+# TODO: hard (unrefreshable) expiry time
+# TODO: add second class to avoid duplicating everything per user
 @dataclass
 class MediaHandler:
   EXPIRY_TIME = 60 * 10
@@ -18,6 +20,7 @@ class MediaHandler:
   on_event: Callable[[events.NewMessage.Event], Awaitable[None]]
   on_done: Callable[[Any], Awaitable[None]]
   on_cancel: Callable[[Any], Awaitable[None]]
+  on_inline_start: Callable[[Any], Awaitable[None]] = None
   extra_kwargs: dict = field(default_factory=dict)
   expires_at: float = field(init=False, default=None)
 
@@ -53,12 +56,23 @@ class MediaHandler:
       **self.extra_kwargs
     )
 
+  async def inline_start(self, event, query):
+    await self.on_inline_start(
+      event=event,
+      query=query,
+      **self.extra_kwargs
+    )
+
 
 # sentinel for cancelling the operation
 Cancel = object()
 user_media_handlers: dict[int, MediaHandler] = {}
 user_next_is_delete: set[int] = set()
 default_handler = None
+
+
+def get_user_handler(user_id):
+  return user_media_handlers.get(user_id)
 
 
 def get_user_handler_name(user_id):

@@ -6,6 +6,7 @@ from telethon import events
 
 from proxy_globals import client, me
 import db, utils
+from query_parser import ParsedQuery
 from p_help import add_to_help
 import p_media_mode
 import p_stats
@@ -33,7 +34,7 @@ def check_transferring(handler):
 @check_transferring
 async def delete(event: events.NewMessage.Event, transfer_type):
   await event.reply(
-    f'Use the button below to delete an item from your {transfer_type}',
+    f'Use the button below to unselect an item for the {transfer_type}',
     buttons=[[utils.inline_pm_button('Delete', 'marked:y delete:y')]]
   )
   raise events.StopPropagation
@@ -48,13 +49,14 @@ async def on_export(event: events.NewMessage.Event, show_help):
   """
   if p_media_mode.get_user_handler_name(event.sender_id) == 'export':
     return
-  await db.mark_all_user_media(event.sender_id, False)
+  await db.mark_all_user_media(event.sender_id, False, True)
   await p_media_mode.set_user_handler(
     name='export',
     user_id=event.sender_id,
     on_event=on_export_media,
     on_done=on_export_done,
     on_cancel=on_export_cancel,
+    on_inline_start=on_export_inline_start,
     extra_kwargs={
       'chat': await event.get_input_chat()
     }
@@ -69,17 +71,10 @@ async def on_export(event: events.NewMessage.Event, show_help):
   )
 
 
-async def on_export_media(event, m_type, is_delete, chat):
-  file_id = event.file.media.id
-  try:
-    await db.mark_user_media(event.sender_id, file_id, not is_delete)
-  except ValueError as e:
-    await event.reply(f'Error: {e}')
-    return
-
-  msg = [
-    f'{"Removed" if is_delete else "Added"} <code>{file_id}</code> to the export\n'
-  ]
+async def export_stats(event, initial_msg=None):
+  msg = []
+  if initial_msg:
+    msg.append(initial_msg)
 
   stats = await p_stats.get_stats(event.sender_id, only_marked=True)
   buttons = [utils.inline_pm_button('Add', 'marked:n')]
@@ -104,6 +99,29 @@ async def on_export_media(event, m_type, is_delete, chat):
   )
 
 
+async def on_export_inline_start(event, query: ParsedQuery, chat):
+  is_delete = query.has('delete')
+  r = await db.mark_all_user_media_from_query(event.sender_id, query, not is_delete)
+  await export_stats(
+    event,
+    f'{"Uns" if is_delete else "S"}elected {r["updated"]} item(s) for export\n'
+  )
+
+
+async def on_export_media(event, m_type, is_delete, chat):
+  file_id = event.file.media.id
+  try:
+    await db.mark_user_media(event.sender_id, file_id, not is_delete)
+  except ValueError as e:
+    await event.reply(f'Error: {e}')
+    return
+
+  await export_stats(
+    event,
+    f'{"Uns" if is_delete else "S"}elected <code>{file_id}</code> for export\n'
+  )
+
+
 async def on_export_done(chat):
   docs = await db.get_marked_user_media(chat.user_id)
   if not docs:
@@ -122,7 +140,7 @@ async def on_export_done(chat):
     chat,
     caption=(
       f'/import\nForward to @{me.username} to import'
-      f' this collection of {len(docs)} items'
+      f' this collection of {len(docs)} item(s)'
     ),
     file=file,
     force_document=True
@@ -139,6 +157,3 @@ async def on_export_cancel(chat, replaced_with_self):
     if num_unmarked else
     'The export was cancelled.'
   )
-
-# add from query (for export)
-# delete from query
