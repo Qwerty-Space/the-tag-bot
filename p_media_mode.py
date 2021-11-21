@@ -85,7 +85,7 @@ class UserMediaHandler:
 
 
 @dataclass
-class UserMediaHandlerHardLimit:
+class UserMediaHandlerHardLimit(UserMediaHandler):
   dies_at: float = field(init=False, default=None)
 
   def __post_init__(self):
@@ -133,7 +133,7 @@ async def set_user_handler(user_id, name, **kwargs):
   handler = user_media_handlers.get(user_id)
   if handler:
     await handler.cancel(replaced_with_self=handler.base is base)
-  user_media_handlers[user_id] = UserMediaHandler(base, extra_kwargs=kwargs)
+  user_media_handlers[user_id] = UserMediaHandlerHardLimit(base, extra_kwargs=kwargs)
 
 
 def set_delete_next(user_id, is_delete=True):
