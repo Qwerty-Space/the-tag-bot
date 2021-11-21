@@ -1,5 +1,6 @@
 import asyncio
 import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Awaitable
 
@@ -10,18 +11,37 @@ from data_model import MediaTypes
 import utils
 
 
-# TODO: hard (unrefreshable) expiry time
-# TODO: add second class to avoid duplicating everything per user
+# Expiry after the last interaction
+SOFT_EXPIRY_TIME = 60 * 20
+# Expiry since creation
+HARD_EXPIRY_TIME = 60 * 60
+
+
+async def async_do_nothing(*args, **kwargs):
+  pass
+
+
+@dataclass
+class MediaHandlerInline:
+  on_start: Callable[[Any], Awaitable[None]]
+
+
 @dataclass
 class MediaHandler:
-  EXPIRY_TIME = 60 * 10
-
   name: str
-  on_event: Callable[[events.NewMessage.Event], Awaitable[None]]
+  on_event: Callable[[Any], Awaitable[None]]
   on_done: Callable[[Any], Awaitable[None]]
   on_cancel: Callable[[Any], Awaitable[None]]
-  on_inline_start: Callable[[Any], Awaitable[None]] = None
+  inline: MediaHandlerInline = field(
+    default_factory=lambda: default_inline_handler
+  )
+
+
+@dataclass
+class UserMediaHandler:
+  base: MediaHandler
   extra_kwargs: dict = field(default_factory=dict)
+  last_query: str = field(init=False, default='')
   expires_at: float = field(init=False, default=None)
 
   def __post_init__(self):
@@ -31,10 +51,10 @@ class MediaHandler:
     return time.time() >= self.expires_at
 
   def refresh_expiry(self):
-    self.expires_at = time.time() + MediaHandler.EXPIRY_TIME
+    self.expires_at = time.time() + SOFT_EXPIRY_TIME
 
   async def event(self, event, m_type, is_delete=False):
-    r = await self.on_event(
+    r = await self.base.on_event(
       event=event,
       m_type=m_type,
       is_delete=is_delete,
@@ -45,52 +65,81 @@ class MediaHandler:
       return r
 
   async def done(self):
-    r = await self.on_done(**self.extra_kwargs)
+    r = await self.base.on_done(**self.extra_kwargs)
     if r is Cancel:
       await self.cancel()
       return r
 
   async def cancel(self, replaced_with_self=False):
-    await self.on_cancel(
+    await self.base.on_cancel(
       replaced_with_self=replaced_with_self,
       **self.extra_kwargs
     )
 
   async def inline_start(self, event, query):
-    await self.on_inline_start(
+    await self.base.inline.on_start(
       event=event,
       query=query,
       **self.extra_kwargs
     )
 
 
+@dataclass
+class UserMediaHandlerHardLimit:
+  dies_at: float = field(init=False, default=None)
+
+  def __post_init__(self):
+    self.dies_at = time.time() + HARD_EXPIRY_TIME
+    self.refresh_expiry()
+
+  def is_expired(self):
+    cur_time = time.time()
+    return cur_time >= self.expires_at or cur_time >= self.dies_at
+
+
 # sentinel for cancelling the operation
 Cancel = object()
-user_media_handlers: dict[int, MediaHandler] = {}
+
+default_inline_handler = MediaHandlerInline(
+  on_start=async_do_nothing
+)
+default_handler = MediaHandler(
+  name='default',
+  on_event=async_do_nothing,
+  on_done=async_do_nothing,
+  on_cancel=async_do_nothing
+)
+media_handlers: dict[str, MediaHandler] = {}
+
+user_media_handlers: dict[int, UserMediaHandler] = defaultdict(
+  lambda: UserMediaHandler(default_handler)
+)
 user_next_is_delete: set[int] = set()
-default_handler = None
 
 
 def get_user_handler(user_id):
-  return user_media_handlers.get(user_id)
+  return user_media_handlers[user_id]
 
 
-def get_user_handler_name(user_id):
-  handler = user_media_handlers.get(user_id)
-  return handler.name if handler else None
+def register_handler(handler: MediaHandler):
+  if handler.name in media_handlers:
+    raise RuntimeError(f'Handler "{handler.name}" already registered')
+  media_handlers[handler.name] = handler
+  return handler.name
 
 
-async def set_user_handler(name, user_id, *args, **kwargs):
+async def set_user_handler(user_id, name, **kwargs):
+  base = media_handlers[name]
   handler = user_media_handlers.get(user_id)
   if handler:
-    await handler.cancel(replaced_with_self=handler.name == name)
-  user_media_handlers[user_id] = MediaHandler(*args, name=name, **kwargs)
+    await handler.cancel(replaced_with_self=handler.base is base)
+  user_media_handlers[user_id] = UserMediaHandler(base, extra_kwargs=kwargs)
 
 
 def set_delete_next(user_id, is_delete=True):
   """
-  Sets or removes the flag to send the delete flag for the next taggable media
-  sent via this bot
+  Sets or removes the flag to send the delete flag for the next
+  taggable media which was sent via this bot
   """
   if is_delete:
     user_next_is_delete.add(user_id)
@@ -111,11 +160,7 @@ async def on_taggable_media(event):
   user_next_is_delete.discard(event.sender_id)
   is_delete = is_delete and event.message.via_bot_id == me.id
 
-  handler = user_media_handlers.get(event.sender_id)
-  if not handler or handler.is_expired():
-    if default_handler:
-      await default_handler(event=event, m_type=m_type, is_delete=is_delete)
-    return
+  handler = user_media_handlers[event.sender_id]
   handler.refresh_expiry()
   if await handler.event(event, m_type, is_delete) is Cancel:
     user_media_handlers.pop(event.sender_id, None)
@@ -124,19 +169,17 @@ async def on_taggable_media(event):
 @client.on(events.NewMessage(pattern=r'/done$'))
 @utils.whitelist
 async def on_done(event: events.NewMessage.Event):
-  handler = user_media_handlers.get(event.sender_id)
-  if handler:
-    await handler.done()
-    user_media_handlers.pop(event.sender_id, None)
+  handler = user_media_handlers[event.sender_id]
+  await handler.done()
+  user_media_handlers.pop(event.sender_id, None)
 
 
 @client.on(events.NewMessage(pattern=r'/cancel$'))
 @utils.whitelist
 async def on_cancel(event: events.NewMessage.Event):
-  handler = user_media_handlers.get(event.sender_id)
-  if handler:
-    await handler.cancel()
-    user_media_handlers.pop(event.sender_id, None)
+  handler = user_media_handlers[event.sender_id]
+  await handler.cancel()
+  user_media_handlers.pop(event.sender_id, None)
 
 
 async def expiry_loop():

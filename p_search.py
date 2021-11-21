@@ -14,7 +14,7 @@ from telethon.tl.types import InlineQueryPeerTypeSameBotPM, InputDocument, Input
 
 
 # TODO: cache PM separately from others
-last_query_cache = TTLCache(maxsize=float('inf'), ttl=60 * 30)
+last_query_cache = TTLCache(maxsize=float('inf'), ttl=60 * 20)
 
 @dataclass
 class CachedQuery:
@@ -78,9 +78,9 @@ async def on_inline(event: events.InlineQuery.Event):
   # TODO: make this a method of the media mode handler
   switch_pm_text = None
   switch_pm_param = 'parse'
-  if media_mode_handler and media_mode_handler.inline_start:
-    switch_pm_text = ('Remove all from ' if should_delete else 'Add all to ') + media_mode_handler.name
-    switch_pm_param = f'{media_mode_handler.name}_{cache_id}'
+  if media_mode_handler and media_mode_handler.base.inline:
+    switch_pm_text = ('Remove all from ' if should_delete else 'Add all to ') + media_mode_handler.base.name
+    switch_pm_param = f'{media_mode_handler.base.name}_{cache_id}'
 
   builder = event.builder
   if res_type == MediaTypes.photo:

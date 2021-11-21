@@ -121,15 +121,10 @@ async def on_add(event: events.NewMessage.Event, show_help):
     )
   out_text += '\n\nSend /done when you\'re finished adding media'
   await p_media_mode.set_user_handler(
-    name='add',
     user_id=event.sender_id,
-    on_event=on_add_media,
-    on_done=on_add_done,
-    on_cancel=on_add_cancel,
-    extra_kwargs={
-      'chat': await event.get_input_chat(),
-      'q': q
-    }
+    name='add',
+    chat=await event.get_input_chat(),
+    q=q
   )
   await event.respond(out_text, parse_mode='HTML')
 
@@ -260,4 +255,11 @@ async def on_taggable_delete(event, m_type, is_delete):
   deleted = await db.delete_user_media(event.sender_id, event.file.media.id)
   await event.respond('Media deleted.' if deleted else 'Media not found.')
 
-p_media_mode.default_handler = on_taggable_delete
+p_media_mode.default_handler.on_event = on_taggable_delete
+
+p_media_mode.register_handler(p_media_mode.MediaHandler(
+  name='add',
+  on_event=on_add_media,
+  on_done=on_add_done,
+  on_cancel=on_add_cancel
+))
