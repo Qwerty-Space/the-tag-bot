@@ -1,7 +1,3 @@
-from dataclasses import dataclass, field
-from random import randint
-
-from cachetools import TTLCache
 from telethon import events
 
 from data_model import MediaTypes, InlineResultID
@@ -11,15 +7,6 @@ from proxy_globals import client
 import db, utils, query_parser
 from constants import MAX_RESULTS_PER_PAGE
 from telethon.tl.types import InlineQueryPeerTypeSameBotPM, InputDocument, InputPhoto, UpdateBotInlineSend
-
-
-# TODO: cache PM separately from others
-last_query_cache = TTLCache(maxsize=float('inf'), ttl=60 * 20)
-
-@dataclass
-class CachedQuery:
-  query: str
-  id: str = field(default_factory=lambda: f'{randint(0, 0xFFFFFFFF):08X}')
 
 
 @client.on(events.Raw(UpdateBotInlineSend))
@@ -49,8 +36,6 @@ async def on_inline(event: events.InlineQuery.Event):
     return out_title or f'[{d.type.value}]'
 
   user_id = event.query.user_id
-  last_query_cache[user_id] = CachedQuery(event.text)
-  cache_id = last_query_cache[user_id].id
   q = query_parser.parse_query(event.text)
   offset = int(event.offset or 0)
   is_transfer = q.has('show_transfer')  # TODO: put in db module
