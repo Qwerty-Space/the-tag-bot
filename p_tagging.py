@@ -142,7 +142,6 @@ async def on_add_media(event, m_type, is_delete, q, chat):
     await db.update_user_media(doc)
   except ValueError as e:
     await event.reply(f'Error: {e}')
-    # TODO: cancel only if media limit reached
     return p_media_mode.Cancel
 
   await event.reply(
