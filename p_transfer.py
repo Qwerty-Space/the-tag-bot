@@ -111,7 +111,7 @@ def get_start_text(q, is_pm):
   return 'Export all'
 
 
-@export_handler.register('on_event')
+@export_handler.register('on_media')
 async def on_export_media(event, m_type, is_delete, chat):
   file_id = event.file.media.id
   try:

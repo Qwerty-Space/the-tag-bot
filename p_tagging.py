@@ -180,7 +180,7 @@ async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
   await event.reply('Media deleted.' if deleted else 'Media not found.')
 
 
-@p_media_mode.default_handler.register('on_event')
+@p_media_mode.default_handler.register('on_media')
 async def on_taggable_delete(event, m_type, is_delete):
   if not is_delete:
     return

@@ -24,7 +24,7 @@ async def async_do_nothing(*args, **kwargs):
 @dataclass
 class MediaHandler:
   name: str
-  on_event: Callable[[Any], Awaitable[None]] = async_do_nothing
+  on_media: Callable[[Any], Awaitable[None]] = async_do_nothing
   on_done: Callable[[Any], Awaitable[None]] = async_do_nothing
   on_cancel: Callable[[Any], Awaitable[None]] = async_do_nothing
   on_start: Callable[[Any], Awaitable[None]] = async_do_nothing
@@ -61,7 +61,7 @@ class UserMediaHandler:
     self.expires_at = time.time() + SOFT_EXPIRY_TIME
 
   async def event(self, event, m_type, is_delete=False):
-    r = await self.base.on_event(
+    r = await self.base.on_media(
       event=event,
       m_type=m_type,
       is_delete=is_delete,

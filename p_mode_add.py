@@ -40,10 +40,10 @@ async def on_add(event: events.NewMessage.Event, show_help):
   await event.respond(out_text, parse_mode='HTML')
 
 
-@add_handler.register('on_event')
+@add_handler.register('on_media')
 async def on_add_media(event, m_type, is_delete, q, chat):
   if is_delete:
-    return await p_media_mode.default_handler.on_event(event, m_type, is_delete)
+    return await p_media_mode.default_handler.on_media(event, m_type, is_delete)
   doc = await get_doc_from_file(event.sender_id, m_type, event.file)
   calculate_new_tags(doc, q)
   # Skip adding if no tags were provided and the document has no tags
