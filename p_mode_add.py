@@ -69,13 +69,3 @@ async def on_add_done(chat, q):
     'Done adding media? Now use me inline to search your media!',
     buttons=[[utils.inline_pm_button('Search', '')]]
   )
-
-
-@add_handler.register('on_cancel')
-async def on_add_cancel(chat, q, replaced_with_self):
-  if replaced_with_self:
-    return
-  await client.send_message(
-    chat,
-    'The previous add operation was cancelled (any media sent was still saved, however)'
-  )
