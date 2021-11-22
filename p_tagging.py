@@ -198,7 +198,7 @@ async def set_tags(event: events.NewMessage.Event, reply, m_type, show_help):
   except ValueError as e:
     return f'Error: {e}'
 
-  await event.reply(
+  await event.respond(
     format_tagged_doc(doc),
     parse_mode='HTML'
   )
@@ -220,10 +220,10 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type, show_help):
   file_id = reply.file.media.id
   doc = await db.get_user_media(event.sender_id, file_id)
   if not doc:
-    await event.reply('No tags found.')
+    await event.respond('No tags found.')
     return
 
-  await event.reply(
+  await event.respond(
     format_tagged_doc(doc),
     parse_mode='HTML'
   )

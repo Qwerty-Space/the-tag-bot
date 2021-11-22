@@ -2,11 +2,8 @@ from dataclasses import dataclass, field
 
 from telethon import events
 
-from constants import INDEX
 from proxy_globals import client
-from data_model import MediaTypes
 from p_help import add_to_help
-from p_transfer import current_transfer_type
 import db, utils
 
 

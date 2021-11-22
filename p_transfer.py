@@ -33,7 +33,7 @@ def check_transferring(handler):
 @utils.whitelist
 @check_transferring
 async def delete(event: events.NewMessage.Event, transfer_type):
-  await event.reply(
+  await event.respond(
     f'Use the button below to unselect an item for the {transfer_type}',
     buttons=[[utils.inline_pm_button('Delete', 'marked:y delete:y')]]
   )
@@ -113,7 +113,7 @@ async def on_export_media(event, m_type, is_delete, chat):
   try:
     await db.mark_user_media(event.sender_id, file_id, not is_delete)
   except ValueError as e:
-    await event.reply(f'Error: {e}')
+    await event.respond(f'Error: {e}')
     return
 
   await export_stats(
