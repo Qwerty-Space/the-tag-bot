@@ -46,7 +46,7 @@ async def on_export(event: events.NewMessage.Event, show_help):
   """
   if p_media_mode.get_user_handler(event.sender_id) is export_handler:
     return
-  await db.mark_all_user_media(event.sender_id, False, True)
+  await db.mark_all_media(event.sender_id, False, True)
   await p_media_mode.set_user_handler(
     user_id=event.sender_id,
     name='export',
@@ -94,7 +94,7 @@ async def export_stats(event, initial_msg=None):
 async def on_export_inline_start(event, query, chat):
   q = parse_query(query)
   is_delete = q.has('delete')
-  r = await db.mark_all_user_media_from_query(event.sender_id, q, not is_delete)
+  r = await db.mark_all_media_from_query(event.sender_id, q, not is_delete)
   await export_stats(
     event,
     f'{"Uns" if is_delete else "S"}elected {r["updated"]} item(s) for export\n'
@@ -115,7 +115,7 @@ def get_start_text(q, is_pm):
 async def on_export_media(event, m_type, is_delete, chat):
   file_id = event.file.media.id
   try:
-    await db.mark_user_media(event.sender_id, file_id, not is_delete)
+    await db.mark_media(event.sender_id, file_id, not is_delete)
   except ValueError as e:
     await event.respond(f'Error: {e}')
     return
@@ -128,10 +128,10 @@ async def on_export_media(event, m_type, is_delete, chat):
 
 @export_handler.register('on_done')
 async def on_export_done(chat):
-  docs = await db.get_marked_user_media(chat.user_id)
+  docs = await db.get_marked_media(chat.user_id)
   if not docs:
     return p_media_mode.Cancel
-  await db.mark_all_user_media(chat.user_id, False)
+  await db.mark_all_media(chat.user_id, False)
 
   async with client.conversation(chat) as conv:
     await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
@@ -154,7 +154,7 @@ async def on_export_done(chat):
 
 @export_handler.register('on_cancel')
 async def on_export_cancel(chat, replaced_with_self):
-  r = await db.mark_all_user_media(chat.user_id, False)
+  r = await db.mark_all_media(chat.user_id, False)
   num_unmarked = r['updated']
 
   await client.send_message(

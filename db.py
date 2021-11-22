@@ -1,6 +1,4 @@
-# TODO: its always per user, remove _user_ from method names
 import base64
-import json
 import functools
 import struct
 import time
@@ -58,7 +56,7 @@ def resolve_index(func):
 
 
 @resolve_index
-async def count_user_media_by_type(owner: int, only_marked=False, index: str = None):
+async def count_media_by_type(owner: int, only_marked=False, index: str = None):
   q = Search()
   aggs = q.aggs.bucket('user', 'filter', term={'owner': owner})
   if only_marked:
@@ -70,14 +68,14 @@ async def count_user_media_by_type(owner: int, only_marked=False, index: str = N
 
 @acached(TTLCache(1024, ttl=60 * 10))
 @resolve_index
-async def count_user_media(owner: int, index: str):
+async def count_media(owner: int, index: str):
   q = Search().filter('term', owner=owner)
   r = await es.count(index=index, body=q.to_dict())
   return CachedCounter(r['count'])
 
 
 @resolve_index
-async def search_user_media(
+async def search_media(
   owner: int, query: ParsedQuery, index: str, page: int = 0
 ):
   q = gen_search_query(
@@ -97,7 +95,7 @@ async def search_user_media(
 
 
 @resolve_index
-async def get_user_media(owner: int, id: int, index: str):
+async def get_media(owner: int, id: int, index: str):
   try:
     r = await es.get(index=index, id=pack_doc_id(owner, id))
     r['_source']['last_used'] = round(time.time())
@@ -107,7 +105,7 @@ async def get_user_media(owner: int, id: int, index: str):
 
 
 @resolve_index
-async def update_user_media(
+async def update_media(
   doc: TaggedDocument, index: str
 ):
   if any(len(tag) > MAX_TAG_LENGTH for tag in doc.tags):
@@ -117,7 +115,7 @@ async def update_user_media(
   if len(doc.emoji) > MAX_EMOJI_PER_FILE:
     raise ValueError(f'Only {MAX_EMOJI_PER_FILE} emoji are allowed per file!')
 
-  counter = await count_user_media(doc.owner, index=index)
+  counter = await count_media(doc.owner, index=index)
   try:
     r = await es.update(
       index=index,
@@ -143,9 +141,9 @@ async def update_last_used(owner: int, id: int, index: str):
 
 
 @resolve_index
-async def delete_user_media(owner: int, id: int, index: str):
+async def delete_media(owner: int, id: int, index: str):
   try:
-    count = await count_user_media(owner, index=index)
+    count = await count_media(owner, index=index)
     r = await es.delete(
       index=index,
       id=pack_doc_id(owner, id)
@@ -157,7 +155,7 @@ async def delete_user_media(owner: int, id: int, index: str):
 
 
 @resolve_index
-async def mark_user_media(owner: int, id: int, marked=True, index: str = None):
+async def mark_media(owner: int, id: int, marked=True, index: str = None):
   try:
     return await es.update(
       index=index,
@@ -173,7 +171,7 @@ async def mark_user_media(owner: int, id: int, marked=True, index: str = None):
 
 
 @resolve_index
-async def mark_all_user_media(
+async def mark_all_media(
   owner: int,
   marked: bool,
   refresh: bool = False,
@@ -202,13 +200,13 @@ async def mark_all_user_media(
 
 
 @resolve_index
-async def mark_all_user_media_from_query(
+async def mark_all_media_from_query(
   owner: int,
   query: ParsedQuery,
   marked: bool,
   index: str = None
 ):
-  return await mark_all_user_media(
+  return await mark_all_media(
     owner=owner,
     marked=marked,
     refresh=True,
@@ -220,7 +218,7 @@ async def mark_all_user_media_from_query(
 
 
 @resolve_index
-async def get_marked_user_media(
+async def get_marked_media(
   owner: int,
   excludes=['owner', 'last_used', 'created', 'marked'],
   index: str = None

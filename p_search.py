@@ -39,7 +39,7 @@ async def on_inline(event: events.InlineQuery.Event):
   q = query_parser.parse_query(event.text)
   offset = int(event.offset or 0)
   is_transfer = q.has('show_transfer')  # TODO: put in db module
-  total, docs = await db.search_user_media(
+  total, docs = await db.search_media(
     owner=user_id, query=q, page=offset, is_transfer=is_transfer
   )
 

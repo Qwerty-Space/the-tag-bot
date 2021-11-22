@@ -53,7 +53,7 @@ async def get_media_generated_attrs(file):
 async def get_doc_from_file(owner, m_type, file):
   file_id, access_hash = file.media.id, file.media.access_hash
   doc = (
-    await db.get_user_media(owner, file_id)
+    await db.get_media(owner, file_id)
     or TaggedDocument(
       owner=owner, id=file_id, access_hash=access_hash, type=m_type
     )
@@ -89,7 +89,7 @@ async def on_tag(event, reply, m_type):
   calculate_new_tags(doc, q)
 
   try:
-    await db.update_user_media(doc)
+    await db.update_media(doc)
   except ValueError as e:
     return f'Error: {e}'
 
@@ -125,7 +125,7 @@ async def set_tags(event: events.NewMessage.Event, reply, m_type, show_help):
     doc.emoji = new_emoji
 
   try:
-    await db.update_user_media(doc)
+    await db.update_media(doc)
   except ValueError as e:
     return f'Error: {e}'
 
@@ -149,7 +149,7 @@ async def show_tags(event: events.NewMessage.Event, reply, m_type, show_help):
     return await show_help()
 
   file_id = reply.file.media.id
-  doc = await db.get_user_media(event.sender_id, file_id)
+  doc = await db.get_media(event.sender_id, file_id)
   if not doc:
     await event.respond('No tags found.')
     return
@@ -176,7 +176,7 @@ async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
     ]])
 
   file_id = reply.file.media.id
-  deleted = await db.delete_user_media(event.sender_id, file_id)
+  deleted = await db.delete_media(event.sender_id, file_id)
   await event.reply('Media deleted.' if deleted else 'Media not found.')
 
 
@@ -184,5 +184,5 @@ async def delete(event: events.NewMessage.Event, reply, m_type, show_help):
 async def on_taggable_delete(event, m_type, is_delete):
   if not is_delete:
     return
-  deleted = await db.delete_user_media(event.sender_id, event.file.media.id)
+  deleted = await db.delete_media(event.sender_id, event.file.media.id)
   await event.respond('Media deleted.' if deleted else 'Media not found.')

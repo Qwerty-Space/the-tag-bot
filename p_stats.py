@@ -28,7 +28,7 @@ class Stats:
 
 
 async def get_stats(user_id: int, only_marked=False, is_transfer=False):
-  r = await db.count_user_media_by_type(user_id, only_marked, is_transfer=is_transfer)
+  r = await db.count_media_by_type(user_id, only_marked, is_transfer=is_transfer)
   sub_total = None
   total = r["doc_count"]
   if only_marked:

@@ -51,7 +51,7 @@ async def on_add_media(event, m_type, is_delete, q, chat):
     return
 
   try:
-    await db.update_user_media(doc)
+    await db.update_media(doc)
   except ValueError as e:
     await event.reply(f'Error: {e}')
     return p_media_mode.Cancel
