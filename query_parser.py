@@ -19,6 +19,7 @@ class _ParseField:
 class ParsedQuery:
   def __init__(self):
     self.fields = defaultdict(list)
+    self.warnings = []
 
   def append(self, name, value, is_neg=False):
     self.fields[name, is_neg].append(value)
@@ -196,4 +197,5 @@ def parse_query(query):
     else:
       parsed.remove(field.name)
 
-  return parsed, warnings
+  parsed.warnings = warnings
+  return parsed
