@@ -254,6 +254,7 @@ async def on_taggable_delete(event, m_type, is_delete):
   deleted = await db.delete_user_media(event.sender_id, event.file.media.id)
   await event.respond('Media deleted.' if deleted else 'Media not found.')
 
+# TODO: move to another plugin
 p_media_mode.default_handler.on_event = on_taggable_delete
 
 p_media_mode.register_handler(p_media_mode.MediaHandler(
