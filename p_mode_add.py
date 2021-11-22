@@ -1,4 +1,3 @@
-
 from telethon import events
 
 from proxy_globals import client

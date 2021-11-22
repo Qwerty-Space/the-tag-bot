@@ -63,10 +63,6 @@ async def on_inline(event: events.InlineQuery.Event):
   switch_pm_text, switch_pm_param = media_mode_handler.get_inline_switch_pm(
     is_pm=is_in_pm, query_str=event.text, parsed_query=q
   )
-  # TODO: move to transfer plugin
-  # if media_mode_handler and media_mode_handler.base.inline:
-  #   switch_pm_text = ('Remove all from ' if should_delete else 'Add all to ') + media_mode_handler.base.name
-  #   switch_pm_param = f'{media_mode_handler.base.name}_{cache_id}'
 
   builder = event.builder
   if res_type == MediaTypes.photo:

@@ -6,26 +6,23 @@ from telethon import events
 
 from proxy_globals import client, me
 import db, utils
-from query_parser import ParsedQuery
+from query_parser import parse_query
 from p_help import add_to_help
 import p_media_mode
 import p_stats
 
 
-def current_transfer_type(user_id: int):
-  handler = p_media_mode.user_media_handlers.get(user_id)
-  if handler and handler.name in {'import', 'export'}:
-    return handler.name
-  return False
+export_handler = p_media_mode.create_handler('export')
+import_handler = p_media_mode.create_handler('import')
 
 
-def check_transferring(handler):
-  @functools.wraps(handler)
+def check_transferring(callback):
+  @functools.wraps(callback)
   async def wrapper(event, *args, **kwargs):
-    transfer_type = current_transfer_type(event.sender_id)
-    if not transfer_type:
+    handler = p_media_mode.get_user_handler(event.sender.id)
+    if handler not in {export_handler, import_handler}:
       return
-    return await handler(event, *args, **kwargs, transfer_type=transfer_type)
+    return await callback(event, *args, **kwargs, transfer_type=handler.name)
   return wrapper
 
 
@@ -47,19 +44,13 @@ async def on_export(event: events.NewMessage.Event, show_help):
   """
   Exports part of or all of your data to share with friends
   """
-  if p_media_mode.get_user_handler_name(event.sender_id) == 'export':
+  if p_media_mode.get_user_handler(event.sender_id) is export_handler:
     return
   await db.mark_all_user_media(event.sender_id, False, True)
   await p_media_mode.set_user_handler(
-    name='export',
     user_id=event.sender_id,
-    on_event=on_export_media,
-    on_done=on_export_done,
-    on_cancel=on_export_cancel,
-    on_inline_start=on_export_inline_start,
-    extra_kwargs={
-      'chat': await event.get_input_chat()
-    }
+    name='export',
+    chat=await event.get_input_chat()
   )
   await event.respond(
     (
@@ -99,15 +90,28 @@ async def export_stats(event, initial_msg=None):
   )
 
 
-async def on_export_inline_start(event, query: ParsedQuery, chat):
-  is_delete = query.has('delete')
-  r = await db.mark_all_user_media_from_query(event.sender_id, query, not is_delete)
+@export_handler.register('on_start')
+async def on_export_inline_start(event, query, chat):
+  q = parse_query(query)
+  is_delete = q.has('delete')
+  r = await db.mark_all_user_media_from_query(event.sender_id, q, not is_delete)
   await export_stats(
     event,
     f'{"Uns" if is_delete else "S"}elected {r["updated"]} item(s) for export\n'
   )
 
 
+@export_handler.register('get_start_text')
+def get_start_text(q, is_pm):
+  if not is_pm:
+    return
+  is_delete = q.has('delete')
+  if is_delete:
+    return 'Remove all from export'
+  return 'Export all'
+
+
+@export_handler.register('on_event')
 async def on_export_media(event, m_type, is_delete, chat):
   file_id = event.file.media.id
   try:
@@ -122,6 +126,7 @@ async def on_export_media(event, m_type, is_delete, chat):
   )
 
 
+@export_handler.register('on_done')
 async def on_export_done(chat):
   docs = await db.get_marked_user_media(chat.user_id)
   if not docs:
@@ -147,6 +152,7 @@ async def on_export_done(chat):
   )
 
 
+@export_handler.register('on_cancel')
 async def on_export_cancel(chat, replaced_with_self):
   r = await db.mark_all_user_media(chat.user_id, False)
   num_unmarked = r['updated']
