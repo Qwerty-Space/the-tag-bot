@@ -10,9 +10,7 @@ WHITELISTED_IDS = {232787997, 151462131}
 
 
 def inline_pm_button(text, query=''):
-  if query and not query.endswith(' '):
-    query += ' '
-  return Button.switch_inline(text, query, same_peer=True)
+  return Button.switch_inline(text, f'{query} ', same_peer=True)
 
 
 def html_format_tags(tags):
