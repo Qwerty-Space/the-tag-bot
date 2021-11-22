@@ -97,6 +97,7 @@ async def on_inline(event: events.InlineQuery.Event):
 
 @client.on(events.NewMessage(pattern=r'/parse( .+)?'))
 @utils.whitelist
+@p_media_mode.default_handler.register('on_start')
 @add_to_help('parse')
 async def parse(event: events.NewMessage.Event, show_help, query=None):
   """
@@ -117,8 +118,7 @@ async def parse(event: events.NewMessage.Event, show_help, query=None):
 
   await event.respond(out_text, parse_mode=None)
 
-
-p_media_mode.default_inline_handler.get_start_text = (
-  lambda q, is_pm: f'{len(q.warnings)} Warning(s)' if q.warnings else ''
-)
-p_media_mode.default_inline_handler.on_start = parse
+@p_media_mode.default_handler.register('get_start_text')
+def get_parse_warning_text(q, is_pm):
+  if q.warnings:
+    return f'{len(q.warnings)} Warning(s)'

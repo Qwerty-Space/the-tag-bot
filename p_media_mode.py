@@ -22,20 +22,26 @@ async def async_do_nothing(*args, **kwargs):
 
 
 @dataclass
-class MediaHandlerInline:
-  on_start: Callable[[Any], Awaitable[None]]
-  get_start_text: Callable[[Any], str]
-
-
-@dataclass
 class MediaHandler:
   name: str
-  on_event: Callable[[Any], Awaitable[None]]
-  on_done: Callable[[Any], Awaitable[None]]
-  on_cancel: Callable[[Any], Awaitable[None]]
-  inline: MediaHandlerInline = field(
-    default_factory=lambda: default_inline_handler
-  )
+  on_event: Callable[[Any], Awaitable[None]] = async_do_nothing
+  on_done: Callable[[Any], Awaitable[None]] = async_do_nothing
+  on_cancel: Callable[[Any], Awaitable[None]] = async_do_nothing
+  on_start: Callable[[Any], Awaitable[None]] = async_do_nothing
+  get_start_text: Callable[[Any], str] = lambda q, is_pm: None
+
+  def register(self, callback_name):
+    def wrapper(func):
+      current_func = getattr(self, callback_name, None)
+      default_func = self.__dataclass_fields__.get(callback_name, None)
+      if not default_func:
+        raise ValueError(f'Callback "{self.name}.{callback_name}" not found!')
+      default_func = default_func.default
+      if current_func is not default_func:
+        raise ValueError(f'Callback "{self.name}.{callback_name}" already registered!')
+      setattr(self, callback_name, func)
+      return func
+    return wrapper
 
 
 @dataclass
@@ -71,6 +77,7 @@ class UserMediaHandler:
       await self.cancel()
       return r
 
+  # TODO: replace replaced_with_self with a on_reset method (also reset death time)
   async def cancel(self, replaced_with_self=False):
     await self.base.on_cancel(
       replaced_with_self=replaced_with_self,
@@ -78,14 +85,14 @@ class UserMediaHandler:
     )
 
   async def inline_start(self, event):
-    await self.base.inline.on_start(
+    await self.base.on_start(
       event=event,
       query=self.last_query,
       **self.extra_kwargs
     )
 
   def get_inline_switch_pm(self, is_pm, query_str, parsed_query):
-    text = self.base.inline.get_start_text(parsed_query, is_pm)
+    text = self.base.get_start_text(parsed_query, is_pm)
     if not text:
       return None, None
     self.last_query = query_str
@@ -108,17 +115,7 @@ class UserMediaHandlerHardLimit(UserMediaHandler):
 # sentinel for cancelling the operation
 Cancel = object()
 
-default_inline_handler = MediaHandlerInline(
-  on_start=async_do_nothing,
-  get_start_text=lambda *args, **kwargs: ''
-)
-# TODO: use decorator to assign callbacks
-default_handler = MediaHandler(
-  name='default',
-  on_event=async_do_nothing,
-  on_done=async_do_nothing,
-  on_cancel=async_do_nothing
-)
+default_handler = MediaHandler('default')
 media_handlers: dict[str, MediaHandler] = {}
 
 user_media_handlers: dict[int, UserMediaHandler] = defaultdict(
@@ -131,11 +128,11 @@ def get_user_handler(user_id):
   return user_media_handlers[user_id]
 
 
-def register_handler(handler: MediaHandler):
-  if handler.name in media_handlers:
-    raise RuntimeError(f'Handler "{handler.name}" already registered')
-  media_handlers[handler.name] = handler
-  return handler.name
+def create_handler(name: str):
+  if name in media_handlers:
+    raise RuntimeError(f'Handler "{name}" already registered')
+  media_handlers[name] = MediaHandler(name)
+  return media_handlers[name]
 
 
 async def set_user_handler(user_id, name, **kwargs):
