@@ -201,13 +201,12 @@ async def on_start_inline(event: events.NewMessage.Event):
 
 async def expiry_loop():
   while 1:
-    await asyncio.sleep(10)
-
     user_id, handler = next(
       ((uid, h) for uid, h in user_media_handlers.items() if h.is_expired()),
       (None, None)
     )
     if not handler:
+      await asyncio.sleep(10)
       continue
 
     logger.info(f'Handler {handler.name} for #{user_id} has expired')
