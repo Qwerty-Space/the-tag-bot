@@ -215,7 +215,8 @@ async def expiry_loop():
     try:
       await handler.cancel()
       # try to avoid flood waits when sending a lot of cancellation messages
-      await asyncio.sleep(0.5)
+      if handler.name != 'default':
+        await asyncio.sleep(0.5)
     except Exception as e:
       logger.exception(f'Unhandled exception on expired handler ({handler.name}) for #{user_id}', e)
 
