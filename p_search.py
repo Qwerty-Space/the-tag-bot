@@ -75,12 +75,13 @@ async def on_inline(event: events.InlineQuery.Event):
     p_media_mode.set_delete_next(user_id, should_delete)
   skip_update = should_delete or (media_mode_handler and is_in_pm)
 
-  # TODO: make this a method of the media mode handler
-  switch_pm_text = None
-  switch_pm_param = 'parse'
-  if media_mode_handler and media_mode_handler.base.inline:
-    switch_pm_text = ('Remove all from ' if should_delete else 'Add all to ') + media_mode_handler.base.name
-    switch_pm_param = f'{media_mode_handler.base.name}_{cache_id}'
+  switch_pm_text, switch_pm_param = media_mode_handler.get_inline_switch_pm(
+    is_pm=is_in_pm, query_str=event.text, parsed_query=q
+  )
+  # TODO: move to transfer plugin
+  # if media_mode_handler and media_mode_handler.base.inline:
+  #   switch_pm_text = ('Remove all from ' if should_delete else 'Add all to ') + media_mode_handler.base.name
+  #   switch_pm_param = f'{media_mode_handler.base.name}_{cache_id}'
 
   builder = event.builder
   if res_type == MediaTypes.photo:
@@ -100,10 +101,10 @@ async def on_inline(event: events.InlineQuery.Event):
     )
   await event.answer(
     [get_result(d) for d in docs],
-    cache_time=0 if warnings or skip_update or is_transfer else 5,
+    cache_time=0 if switch_pm_text else 5,
     private=True,
     next_offset=f'{offset + 1}' if total > MAX_RESULTS_PER_PAGE else None,
-    switch_pm=f'{len(warnings)} Warning(s)' if warnings else switch_pm_text,
+    switch_pm=switch_pm_text,
     switch_pm_param=switch_pm_param,
     gallery=(res_type in gallery_types)
   )
@@ -123,47 +124,16 @@ async def parse(event: events.NewMessage.Event, show_help, query=None):
     return await show_help()
 
   out_text = ''
+  q = query_parser.parse_query(query)
   if q.warnings:
     out_text += 'Errors:\n' + '\n'.join(q.warnings) + '\n'
 
   out_text += '\nParsed fields:\n' + q.pretty()
 
-  await event.reply(out_text, parse_mode=None)
+  await event.respond(out_text, parse_mode=None)
 
 
-@client.on(events.NewMessage(pattern=r'/start parse$'))
-@utils.whitelist
-async def parse_from_start(event: events.NewMessage.Event):
-  query = last_query_cache.get(event.sender_id, None)
-  if not query:
-    await event.respond('No previous query found.')
-    return
-  await parse(event, query=query)
-
-
-@client.on(events.NewMessage(pattern=r'/start parse$'))
-@utils.whitelist
-async def parse_from_start(event: events.NewMessage.Event):
-  query = last_query_cache.get(event.sender_id, None)
-  if not query:
-    await event.respond('No previous query found.')
-    return
-  await parse(event, query=query)
-
-
-# TODO: move this to media mode plugin
-@client.on(events.NewMessage(pattern=r'/start (\w+)_([\dABCDEF]{8})$'))
-@utils.whitelist
-async def media_mode_start(event: events.NewMessage.Event):
-  name = event.pattern_match[1]
-  handler = p_media_mode.get_user_handler(event.sender_id)
-  if not handler or handler.name != name or not handler.inline_start:
-    return
-
-  query = last_query_cache.get(event.sender_id, None)
-  cache_id = event.pattern_match[2]
-  if not query or query.id != cache_id:
-    await event.respond('Error: query not found, please try again')
-    return
-  q, warnings = query_parser.parse_query(query.query)
-  await handler.inline_start(event, q)
+p_media_mode.default_inline_handler.get_start_text = (
+  lambda q, is_pm: f'{len(q.warnings)} Warning(s)' if q.warnings else ''
+)
+p_media_mode.default_inline_handler.on_start = parse

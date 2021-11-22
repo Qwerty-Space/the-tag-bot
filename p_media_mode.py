@@ -24,6 +24,7 @@ async def async_do_nothing(*args, **kwargs):
 @dataclass
 class MediaHandlerInline:
   on_start: Callable[[Any], Awaitable[None]]
+  get_start_text: Callable[[Any], str]
 
 
 @dataclass
@@ -76,12 +77,22 @@ class UserMediaHandler:
       **self.extra_kwargs
     )
 
-  async def inline_start(self, event, query):
+  async def inline_start(self, event):
     await self.base.inline.on_start(
       event=event,
-      query=query,
+      query=self.last_query,
       **self.extra_kwargs
     )
+
+  def get_inline_switch_pm(self, is_pm, query_str, parsed_query):
+    text = self.base.inline.get_start_text(parsed_query, is_pm)
+    if not text:
+      return None, None
+    # TODO: is it even necessary to ensure that this button is associated with this query?
+    # how often does someone do another inline search before finishing the first?
+    param = f'inline_{utils.hex_crc32(query_str)}'
+    self.last_query = query_str
+    return text, param
 
 
 @dataclass
@@ -101,8 +112,10 @@ class UserMediaHandlerHardLimit(UserMediaHandler):
 Cancel = object()
 
 default_inline_handler = MediaHandlerInline(
-  on_start=async_do_nothing
+  on_start=async_do_nothing,
+  get_start_text=lambda *args, **kwargs: ''
 )
+# TODO: use decorator to assign callbacks
 default_handler = MediaHandler(
   name='default',
   on_event=async_do_nothing,
@@ -180,6 +193,17 @@ async def on_cancel(event: events.NewMessage.Event):
   handler = user_media_handlers[event.sender_id]
   await handler.cancel()
   user_media_handlers.pop(event.sender_id, None)
+
+
+@client.on(events.NewMessage(pattern=r'/start inline_([\dABCDEF]{8})$'))
+@utils.whitelist
+async def on_start(event: events.NewMessage.Event):
+  checksum = event.pattern_match[1]
+  handler = user_media_handlers[event.sender_id]
+  if utils.hex_crc32(handler.last_query) != checksum:
+    await event.respond('Error: can\'t find previous query, please only use this bot inline in one chat at a time!')
+    return
+  await handler.inline_start(event)
 
 
 async def expiry_loop():
