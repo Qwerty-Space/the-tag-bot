@@ -88,11 +88,8 @@ class UserMediaHandler:
     text = self.base.inline.get_start_text(parsed_query, is_pm)
     if not text:
       return None, None
-    # TODO: is it even necessary to ensure that this button is associated with this query?
-    # how often does someone do another inline search before finishing the first?
-    param = f'inline_{utils.hex_crc32(query_str)}'
     self.last_query = query_str
-    return text, param
+    return text, 'inline'
 
 
 @dataclass
@@ -195,14 +192,10 @@ async def on_cancel(event: events.NewMessage.Event):
   user_media_handlers.pop(event.sender_id, None)
 
 
-@client.on(events.NewMessage(pattern=r'/start inline_([\dABCDEF]{8})$'))
+@client.on(events.NewMessage(pattern=r'/start inline$'))
 @utils.whitelist
-async def on_start(event: events.NewMessage.Event):
-  checksum = event.pattern_match[1]
+async def on_start_inline(event: events.NewMessage.Event):
   handler = user_media_handlers[event.sender_id]
-  if utils.hex_crc32(handler.last_query) != checksum:
-    await event.respond('Error: can\'t find previous query, please only use this bot inline in one chat at a time!')
-    return
   await handler.inline_start(event)
 
 

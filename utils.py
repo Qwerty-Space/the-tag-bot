@@ -1,5 +1,4 @@
 import functools
-from zlib import crc32
 
 from cachetools import keys
 from telethon.tl.custom.button import Button
@@ -8,10 +7,6 @@ from data_model import MediaTypes
 
 
 WHITELISTED_IDS = {232787997, 151462131}
-
-
-def hex_crc32(s):
-  return f"{crc32(s.encode('utf-8')):08X}"
 
 
 def inline_pm_button(text, query=''):
