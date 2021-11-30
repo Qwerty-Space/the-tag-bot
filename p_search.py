@@ -21,8 +21,6 @@ async def on_inline_selected(event):
 @client.on(events.InlineQuery())
 @utils.whitelist
 async def on_inline(event: events.InlineQuery.Event):
-  # TODO: highlight matches
-  # https://www.elastic.co/guide/en/elasticsearch/reference/current/highlighting.html#matched-fields
   def get_doc_title(d):
     if d.title and not show_types:
       return d.title
