@@ -1,5 +1,4 @@
-# inherits some classes from elasticsearch to make logging output the user id who
-# caused the request
+# inherits some classes from elasticsearch to log the user id who caused the request
 # it's a "hack" because it might break between minor versions of the library
 
 # currently logging comes from the Connection abstract class
