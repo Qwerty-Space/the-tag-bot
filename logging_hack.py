@@ -37,7 +37,6 @@ class AIOHttpConnectionLogUID(AIOHttpConnection):
   def log_request_success(
     self, method, full_url, path, body, status_code, response, duration
   ):
-    #TODO: do we care about the response?
     if body is not None:
       try:
         body = body.decode("utf-8", "ignore")
