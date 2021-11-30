@@ -1,3 +1,4 @@
+import asyncio
 import functools
 import json
 from io import BytesIO
@@ -133,14 +134,19 @@ async def on_export_done(chat):
     return p_media_mode.Cancel
   await db.mark_all_media(chat.user_id, False)
 
-  async with client.conversation(chat) as conv:
-    await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
-    resp = await conv.get_response()
-    if resp.raw_text.startswith('/'):
-      return
+  title = 'export'
+  try:
+    async with client.conversation(chat, total_timeout=60 * 10) as conv:
+      await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
+      resp = await conv.get_response()
+      if resp.raw_text.startswith('/'):
+        return
+      title = resp.raw_text
+  except asyncio.exceptions.TimeoutError:
+    pass
 
   file = BytesIO(json.dumps(docs, sort_keys=True).encode('utf-8'))
-  file.name = f'{resp.raw_text}.json' 
+  file.name = f'{title}.json' 
   await client.send_file(
     chat,
     caption=(
