@@ -5,7 +5,7 @@ from io import BytesIO
 from telethon import events
 
 from proxy_globals import client, me
-from p_transfer import export_handler, send_transfer_stats
+from p_transfer import DATA_VERSION, export_handler, send_transfer_stats
 import db, utils
 from query_parser import parse_query
 from p_help import add_to_help
@@ -84,10 +84,12 @@ async def on_export_done(chat):
   try:
     async with client.conversation(chat, total_timeout=60 * 10) as conv:
       await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
-      resp = await conv.get_response()
-      if resp.raw_text.startswith('/'):
-        return
-      title = resp.raw_text
+      while 1:
+        resp = await conv.get_response()
+        if not resp.raw_text or resp.raw_text.startswith('/'):
+          continue
+        title = resp.raw_text
+        break
   except asyncio.exceptions.TimeoutError:
     pass
 
@@ -96,7 +98,8 @@ async def on_export_done(chat):
   await client.send_file(
     chat,
     caption=(
-      f'/import\nForward to @{me.username} to import'
+      f'/import_v{DATA_VERSION}'
+      f'\nForward to @{me.username} to import'
       f' this collection of {len(docs)} item(s)'
     ),
     file=file,

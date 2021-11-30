@@ -8,6 +8,9 @@ import p_media_mode
 import p_stats
 
 
+# Only collections with this version will be accepted to be imported
+DATA_VERSION = 1
+
 export_handler = p_media_mode.create_handler('export')
 import_handler = p_media_mode.create_handler('import')
 
