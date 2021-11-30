@@ -9,6 +9,19 @@ from boltons.setutils import IndexedSet
 from telethon import tl
 
 
+class DocumentID:
+  "Represents a document id inside elasticsearch"
+  PACKED_FMT = '!QQ'
+
+  @staticmethod
+  def pack(owner: int, id: int):
+    return urlsafe_b64encode(struct.pack('!QQ', owner, id))
+
+  @staticmethod
+  def unpack(str_id):
+    return struct.unpack(DocumentID.PACKED_FMT, urlsafe_b64decode(str_id))
+
+
 @dataclass
 class InlineResultID:
   PACKED_FMT = '!Q?'

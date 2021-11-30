@@ -1,6 +1,4 @@
-import base64
 import functools
-import struct
 import time
 from dataclasses import dataclass
 from typing import Callable
@@ -13,7 +11,7 @@ import db_init
 from gen_search_query import gen_search_query
 from utils import acached
 from query_parser import ParsedQuery
-from data_model import TaggedDocument
+from data_model import TaggedDocument, DocumentID
 from constants import (
   MAX_MEDIA_PER_USER, MAX_EMOJI_PER_FILE, MAX_TAGS_PER_FILE, MAX_TAG_LENGTH,
   MAX_RESULTS_PER_PAGE, INDEX
@@ -34,10 +32,6 @@ class CachedCounter:
 
 es = db_init.es_main
 init = db_init.init
-
-
-def pack_doc_id(owner: int, id: int):
-  return base64.urlsafe_b64encode(struct.pack('!QQ', owner, id))
 
 
 def get_index(is_transfer):
@@ -97,7 +91,7 @@ async def search_media(
 @resolve_index
 async def get_media(owner: int, id: int, index: str):
   try:
-    r = await es.get(index=index, id=pack_doc_id(owner, id))
+    r = await es.get(index=index, id=DocumentID.pack(owner, id))
     r['_source']['last_used'] = round(time.time())
     return TaggedDocument(**r['_source'])
   except NotFoundError:
@@ -119,7 +113,7 @@ async def update_media(
   try:
     r = await es.update(
       index=index,
-      id=pack_doc_id(doc.owner, doc.id),
+      id=DocumentID.pack(doc.owner, doc.id),
       doc=doc.to_dict(),
       doc_as_upsert=(counter.count < MAX_MEDIA_PER_USER),
     )
@@ -135,7 +129,7 @@ async def update_media(
 async def update_last_used(owner: int, id: int, index: str):
   return await es.update(
     index=index,
-    id=pack_doc_id(owner, id),
+    id=DocumentID.pack(owner, id),
     doc={'last_used': round(time.time())}
   )
 
@@ -146,7 +140,7 @@ async def delete_media(owner: int, id: int, index: str):
     count = await count_media(owner, index=index)
     r = await es.delete(
       index=index,
-      id=pack_doc_id(owner, id)
+      id=DocumentID.pack(owner, id)
     )
     count.offset -= 1
     return r
@@ -159,7 +153,7 @@ async def mark_media(owner: int, id: int, marked=True, index: str = None):
   try:
     return await es.update(
       index=index,
-      id=pack_doc_id(owner, id),
+      id=DocumentID.pack(owner, id),
       doc={
         'marked': marked,
         'last_used': round(time.time())
