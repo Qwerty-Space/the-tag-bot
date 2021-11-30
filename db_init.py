@@ -2,8 +2,9 @@ import json
 import logging
 import hashlib
 
-from elasticsearch import AsyncElasticsearch, NotFoundError
+from elasticsearch import NotFoundError
 
+from logging_hack import AsyncElasticsearch
 from secrets import HTTP_PASS, ADMIN_HTTP_PASS
 from constants import ELASTIC_USERNAME, INDEX
 
