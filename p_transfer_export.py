@@ -75,6 +75,7 @@ async def on_export_media(event, m_type, is_delete, chat):
 
 @export_handler.register('on_done')
 async def on_export_done(chat):
+  #TODO: use count here to prevent holding docs in memory
   docs = await db.get_marked_media(chat.user_id)
   if not docs:
     return p_media_mode.Cancel
@@ -86,6 +87,8 @@ async def on_export_done(chat):
       await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
       while 1:
         resp = await conv.get_response()
+        if resp.raw_text == '/cancel':
+          return p_media_mode.Cancel
         if not resp.raw_text or resp.raw_text.startswith('/'):
           continue
         title = resp.raw_text
