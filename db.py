@@ -34,15 +34,11 @@ es = db_init.es_main
 init = db_init.init
 
 
-def get_index(is_transfer):
-  return INDEX.transfer if is_transfer else INDEX.main
-
-
 def resolve_index(func):
   @functools.wraps(func)
   def wrapper(*args, **kwargs):
     index = kwargs.get('index') or INDEX.main
-    if kwargs.pop('is_transfer', None):
+    if kwargs.pop('use_transfer', None):
       index = INDEX.transfer
     kwargs['index'] = index
     return func(*args, **kwargs)

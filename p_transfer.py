@@ -33,15 +33,15 @@ async def delete(event: events.NewMessage.Event, transfer_type):
   raise events.StopPropagation
 
 
-async def send_transfer_stats(event, initial_msg=None, only_marked=True, is_transfer=False):
+async def send_transfer_stats(event, initial_msg=None, only_marked=True, use_transfer=False):
   msg = []
   if initial_msg:
     msg.append(initial_msg)
 
   handler = p_media_mode.get_user_handler(event.sender.id)
   name = handler.base.name
-  query_suf = 'pending:y ' if is_transfer else ''
-  stats = await p_stats.get_stats(event.sender_id, only_marked, is_transfer)
+  query_suf = 'pending:y ' if use_transfer else ''
+  stats = await p_stats.get_stats(event.sender_id, only_marked, use_transfer)
   buttons = [utils.inline_pm_button('Add', f'{query_suf}marked:n')]
 
   if stats.sub_total:
