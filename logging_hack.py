@@ -27,7 +27,6 @@ def extract_user_id(path, body):
     return doc_id.owner
   if not body:
     return
-  print(body)
   # TODO: maybe don't use regex to search json
   user_id = re.search(r'"owner":(\d+)', body)
   if user_id:

@@ -37,9 +37,8 @@ def gen_search_query(
   sort=True,
   includes=[],
 ):
-  q = initial_q if initial_q else Search()
+  q = initial_q if initial_q else Search().filter('term', owner=owner)
 
-  q = q.filter('term', owner=owner)
   if sort:
     q = q.sort('_score', '-last_used')
   if includes:
