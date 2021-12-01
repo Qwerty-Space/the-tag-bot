@@ -177,7 +177,8 @@ async def on_taggable_media(event):
 @utils.whitelist
 async def on_done(event: events.NewMessage.Event):
   handler = user_media_handlers.pop(event.sender_id, None)
-  await handler.done()
+  if handler:
+    await handler.done()
 
 
 @client.on(events.NewMessage(pattern=r'/cancel$'))
