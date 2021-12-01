@@ -64,16 +64,15 @@ async def count_media(owner: int, index: str):
   return CachedCounter(r['count'])
 
 
-@resolve_index
 async def search_media(
-  owner: int, query: ParsedQuery, index: str, page: int = 0
+  owner: int, query: ParsedQuery, page: int = 0
 ):
   q = gen_search_query(
     owner, query, includes=['id', 'access_hash', 'type', 'tags', 'emoji', 'filename', 'title']
   )
 
   r = await es.search(
-    index=index,
+    index=INDEX.transfer if query.has('show_transfer') else INDEX.main,
     size=MAX_RESULTS_PER_PAGE,
     from_=page * MAX_RESULTS_PER_PAGE,
     **q.to_dict()
