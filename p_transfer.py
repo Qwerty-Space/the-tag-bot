@@ -18,7 +18,7 @@ import_handler = p_media_mode.create_handler('import')
 def check_transferring(callback):
   @functools.wraps(callback)
   async def wrapper(event, *args, **kwargs):
-    handler = p_media_mode.get_user_handler(event.sender.id)
+    handler = p_media_mode.get_user_handler(event.sender.id).base
     if handler not in {export_handler, import_handler}:
       return
     return await callback(event, *args, **kwargs, transfer_type=handler.base.name)

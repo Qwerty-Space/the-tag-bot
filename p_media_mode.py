@@ -7,6 +7,7 @@ from typing import Any, Callable, Awaitable
 from telethon import events
 
 from proxy_globals import client, logger, me
+from p_help import add_to_help
 from data_model import MediaTypes
 import utils
 
@@ -77,12 +78,8 @@ class UserMediaHandler:
       await self.cancel()
       return r
 
-  # TODO: replace replaced_with_self with a on_reset method (also reset death time)
-  async def cancel(self, replaced_with_self=False):
-    await self.base.on_cancel(
-      replaced_with_self=replaced_with_self,
-      **self.extra_kwargs
-    )
+  async def cancel(self):
+    await self.base.on_cancel(**self.extra_kwargs)
 
   async def inline_start(self, event):
     await self.base.on_start(
@@ -139,7 +136,7 @@ async def set_user_handler(user_id, name, **kwargs):
   base = media_handlers[name]
   handler = user_media_handlers.get(user_id)
   if handler:
-    await handler.cancel(replaced_with_self=handler.base is base)
+    await handler.cancel()
   user_media_handlers[user_id] = UserMediaHandlerHardLimit(base, extra_kwargs=kwargs)
 
 
@@ -175,7 +172,9 @@ async def on_taggable_media(event):
 
 @client.on(events.NewMessage(pattern=r'/done$'))
 @utils.whitelist
-async def on_done(event: events.NewMessage.Event):
+@add_to_help('done')
+async def on_done(event: events.NewMessage.Event, show_help):
+  """Finalizes the current operation, if possible"""
   handler = user_media_handlers.pop(event.sender_id, None)
   if handler:
     await handler.done()
@@ -183,10 +182,12 @@ async def on_done(event: events.NewMessage.Event):
 
 @client.on(events.NewMessage(pattern=r'/cancel$'))
 @utils.whitelist
-async def on_cancel(event: events.NewMessage.Event):
-  handler = user_media_handlers[event.sender_id]
-  await handler.cancel()
-  user_media_handlers.pop(event.sender_id, None)
+@add_to_help('cancel')
+async def on_cancel(event: events.NewMessage.Event, show_help):
+  "Cancels the current operation, if possible"
+  handler = user_media_handlers.pop(event.sender_id, None)
+  if handler:
+    await handler.cancel()
 
 
 @client.on(events.NewMessage(pattern=r'/start inline$'))

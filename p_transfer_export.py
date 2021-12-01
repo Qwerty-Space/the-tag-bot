@@ -19,7 +19,7 @@ async def on_export(event: events.NewMessage.Event, show_help):
   """
   Exports part of or all of your data to share with friends
   """
-  if p_media_mode.get_user_handler(event.sender_id) is export_handler:
+  if p_media_mode.get_user_handler(event.sender_id).base is export_handler:
     return
   await db.mark_all_media(event.sender_id, False, True)
   await p_media_mode.set_user_handler(
@@ -111,7 +111,7 @@ async def on_export_done(chat):
 
 
 @export_handler.register('on_cancel')
-async def on_export_cancel(chat, replaced_with_self):
+async def on_export_cancel(chat):
   r = await db.mark_all_media(chat.user_id, False)
   num_unmarked = r['updated']
 
