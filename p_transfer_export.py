@@ -87,10 +87,8 @@ async def on_export_done(chat):
       await conv.send_message('Enter a title for the exported data, or /cancel to cancel the export.')
       while 1:
         resp = await conv.get_response()
-        if resp.raw_text.startswith('/cancel'):
-          return p_media_mode.Cancel
         if not resp.raw_text or resp.raw_text.startswith('/'):
-          continue
+          return p_media_mode.Cancel
         title = resp.raw_text
         break
   except asyncio.exceptions.TimeoutError:
