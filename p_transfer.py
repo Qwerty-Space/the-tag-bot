@@ -36,16 +36,21 @@ async def delete(event: events.NewMessage.Event, transfer_type):
   raise events.StopPropagation
 
 
-async def send_transfer_stats(event, initial_msg=None, only_marked=True, use_transfer=False):
+async def send_transfer_stats(
+  event,
+  initial_msg=None,
+  only_marked=True,
+  use_transfer=False,
+  buttons=[],
+  empty_buttons=[]
+):
   msg = []
   if initial_msg:
     msg.append(initial_msg)
 
   handler = p_media_mode.get_user_handler(event.sender.id)
   name = handler.base.name
-  query_suf = 'pending:y ' if use_transfer else ''
   stats = await p_stats.get_stats(event.sender_id, only_marked, use_transfer)
-  buttons = [utils.inline_pm_button('Add', f'{query_suf}marked:n')]
 
   if stats.sub_total:
     msg.append(f'Here\'s a summary of what will be {name}ed:\n{stats.pretty()}\n')
@@ -53,17 +58,18 @@ async def send_transfer_stats(event, initial_msg=None, only_marked=True, use_tra
       'You can add or remove some items with the buttons below, '
       f'use /done to finalize the {name}, or /cancel it.'
     )
-    buttons.append(utils.inline_pm_button('Remove', f'{query_suf}marked:y delete:y'))
   else:
     msg.append(
       f'No items are marked to be {name}ed, use the button below '
       f'to add some or /cancel the {name}.'
     )
+    buttons = empty_buttons
 
+  buttons = [utils.inline_pm_button(text, query) for text, query in buttons]
   await event.respond(
     '\n'.join(msg),
     parse_mode='HTML',
-    buttons=[buttons]
+    buttons=[buttons] if buttons else None
   )
 
 

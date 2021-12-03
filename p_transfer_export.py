@@ -1,6 +1,7 @@
 import asyncio
 import json
 from io import BytesIO
+from functools import partial
 
 from telethon import events
 
@@ -10,6 +11,13 @@ import db, utils
 from query_parser import parse_query
 from p_help import add_to_help
 import p_media_mode
+
+
+send_transfer_stats = partial(
+  send_transfer_stats,
+  buttons=[('Add', 'marked:n'), ('Remove', 'marked:y delete:y')],
+  empty_buttons=[('Add', 'marked:n')]
+)
 
 
 @client.on(events.NewMessage(pattern=r'/export$'))
