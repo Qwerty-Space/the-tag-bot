@@ -19,7 +19,9 @@ class DocumentID:
 
   @staticmethod
   def pack(owner: int, id: int):
-    return urlsafe_b64encode(struct.pack(DocumentID.PACKED_FMT, owner, id))
+    return urlsafe_b64encode(
+      struct.pack(DocumentID.PACKED_FMT, owner, id)
+    ).decode('ascii')
 
   @classmethod
   def unpack(cls, str_id):
