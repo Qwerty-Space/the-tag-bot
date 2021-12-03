@@ -20,7 +20,7 @@ async def main():
   proxy_globals.me = await client.get_me()
   load_callbacks = []
   for module_name in [
-    'p_cached', 'p_help', 'p_media_mode',
+    'p_conv_grab', 'p_cached', 'p_help', 'p_media_mode',
     'p_stats', 'p_tagging', 'p_search', 'p_mode_add', 'p_transfer'
   ]:
     proxy_globals.logger = logging.getLogger(module_name)
