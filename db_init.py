@@ -9,7 +9,7 @@ from secrets import HTTP_PASS, ADMIN_HTTP_PASS
 from constants import ELASTIC_USERNAME, INDEX
 
 SETTINGS_HASH_FILE = 'settings.hash'
-es_main = AsyncElasticsearch(http_auth=(ELASTIC_USERNAME, HTTP_PASS))
+es_main = AsyncElasticsearch("https://localhost:9200", http_auth=(ELASTIC_USERNAME, HTTP_PASS))
 logger = logging.getLogger('db_init')
 
 # Load settings and calculate hash of minified data
