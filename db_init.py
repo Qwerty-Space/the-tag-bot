@@ -4,7 +4,7 @@ import hashlib
 
 from elasticsearch import NotFoundError
 
-from logging_hack import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch
 from secrets import HTTP_PASS, ADMIN_HTTP_PASS
 from constants import ELASTIC_USERNAME, INDEX
 
