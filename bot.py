@@ -14,6 +14,7 @@ mimetypes.add_type('application/x-tgsticker', '.tgs')
 
 async def main():
   await db.init()
+  # TODO: token from secrets
   await client.start()
 
   proxy_globals.client = client
@@ -21,7 +22,7 @@ async def main():
   load_callbacks = []
   for module_name in [
     'p_conv_grab', 'p_cached', 'p_help', 'p_media_mode',
-    'p_stats', 'p_tagging', 'p_search', 'p_mode_add', 'p_transfer'
+    'p_stats', 'p_tagging', 'p_search', 'p_mode_add'
   ]:
     proxy_globals.logger = logging.getLogger(module_name)
     module = importlib.import_module(module_name)

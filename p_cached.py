@@ -39,6 +39,7 @@ async def get_sticker_pack(sticker_set):
   if not sticker_set:
     return
   try:
+    #TODO: fix on new layer
     return CachedStickerSet(await client(GetStickerSetRequest(sticker_set)))
   except errors.StickersetInvalidError:
     return
